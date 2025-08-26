@@ -452,7 +452,9 @@ const Configuracoes = () => {
               className={`fixed inset-0 z-50 md:hidden transition-opacity duration-300 ease-in-out ${
                 isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
-              aria-hidden={!isMobileMenuOpen}
+              style={{
+                display: isMobileMenuOpen ? 'block' : 'none'
+              }}
             >
               {/* Overlay escuro com transição suave */}
               <div 
