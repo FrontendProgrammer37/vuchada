@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -8,7 +9,7 @@ import Funcionarios from './pages/Funcionarios';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import TodasVendas from './pages/TodasVendas';
-import EfetuarVendaPDV from './pages/EfetuarVendaPDV';
+import PDVPage from './pages/PDVPage';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -27,6 +28,15 @@ const ProtectedRoute = ({ children }) => {
   }
   
   return children;
+};
+
+// Componente para rotas do PDV
+const PDVLayout = ({ children }) => {
+  return (
+    <CartProvider>
+      {children}
+    </CartProvider>
+  );
 };
 
 // Componente principal da aplicação
@@ -54,6 +64,16 @@ const AppContent = () => {
             <Layout>
               <Dashboard />
             </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pdv"
+        element={
+          <ProtectedRoute>
+            <PDVLayout>
+              <PDVPage />
+            </PDVLayout>
           </ProtectedRoute>
         }
       />
@@ -97,19 +117,8 @@ const AppContent = () => {
           </ProtectedRoute>
         }
       />
-
       <Route
-        path="/efetuarvenda"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <EfetuarVendaPDV />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/todasvendas"
+        path="/vendas"
         element={
           <ProtectedRoute>
             <Layout>
@@ -118,12 +127,11 @@ const AppContent = () => {
           </ProtectedRoute>
         }
       />
-      {/* Rota para páginas não encontradas */}
-      <Route 
-        path="*" 
+      <Route
+        path="*"
         element={
-          <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
-        } 
+          <Navigate to="/dashboard" replace />
+        }
       />
     </Routes>
   );
