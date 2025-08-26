@@ -6,7 +6,7 @@ class ApiService {
     constructor() {
         this.baseURL = API_BASE_URL;
         this.token = localStorage.getItem('token');
-        this.apiPrefix = '/api/v0';
+        this.apiPrefix = '/api/v1';
     }
 
     // Configurar headers com token de autenticação
@@ -73,20 +73,10 @@ class ApiService {
     // ===== AUTENTICAÇÃO =====
     
     async register(userData) {
-        const response = await fetch(`${this.baseURL}${this.apiPrefix}/auth/register`, {
+        return this.request('/auth/register', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify(userData),
         });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || 'Falha no registro');
-        }
-
-        return await response.json();
     }
 
     async login(username, password) {
@@ -94,7 +84,8 @@ class ApiService {
         formData.append('username', username);
         formData.append('password', password);
 
-        const response = await fetch(`${this.baseURL}${this.apiPrefix}/auth/login`, {
+        // O endpoint de login espera 'x-www-form-urlencoded', então não usamos o header padrão
+        const data = await this.request('/auth/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -102,12 +93,6 @@ class ApiService {
             body: formData.toString(),
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || 'Falha no login');
-        }
-
-        const data = await response.json();
         this.setToken(data.access_token);
         return data;
     }
