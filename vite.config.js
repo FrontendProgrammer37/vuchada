@@ -14,24 +14,25 @@ export default defineConfig(({ command, mode }) => {
         '@': resolve(__dirname, 'src'),
       },
     },
+    server: {
+      proxy: {
+        '/api': {
+          target: 'https://backend-production-f01c.up.railway.app',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/api/, '')
+        }
+      },
+      port: 5173,
+      open: true
+    },
     build: {
-      // Configurações de build para produção
       outDir: 'dist',
       minify: 'terser',
-      sourcemap: mode === 'development',
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom', 'react-router-dom'],
-          },
-        },
-      },
+      sourcemap: env.VITE_APP_ENV === 'development',
     },
-    server: {
-      // Configurações do servidor de desenvolvimento
-      port: 5173,
-      strictPort: false,
-      open: true,
-    },
+    define: {
+      'process.env': {}
+    }
   }
 })

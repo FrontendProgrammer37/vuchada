@@ -1,12 +1,10 @@
 // Serviço de API para conectar com o backend
 import config from '../config/env';
-const API_BASE_URL = config.API_URL;
 
 class ApiService {
     constructor() {
-        this.baseURL = API_BASE_URL;
+        this.baseURL = config.API_URL; // Já inclui /api/v1 no ambiente de produção
         this.token = localStorage.getItem('token');
-        this.apiPrefix = '/api/v1';
     }
 
     // Configurar headers com token de autenticação
@@ -36,11 +34,12 @@ class ApiService {
 
     // Função genérica para fazer requisições
     async request(endpoint, options = {}) {
-        // Garante que o endpoint comece com / e adiciona o prefixo da API
-        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-        const url = `${this.baseURL}${this.apiPrefix}${normalizedEndpoint}`;
+        // Remove a barra inicial se existir para evitar duplicação
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+        const url = `${this.baseURL}/${normalizedEndpoint}`;
         
         const config = {
+            method: 'GET',
             headers: this.getHeaders(),
             ...options,
         };
@@ -48,22 +47,21 @@ class ApiService {
         try {
             const response = await fetch(url, config);
             
-            if (response.status === 401) {
-                this.removeToken();
-                window.location.href = '/login';
-                return;
-            }
-
+            // Se a resposta não for OK, lança um erro
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                const error = new Error(errorData.message || 'Erro na requisição');
+                error.status = response.status;
+                error.data = errorData;
+                throw error;
             }
 
-            if (response.status === 204) {
-                return {};
+            // Tenta fazer o parse da resposta como JSON
+            try {
+                return await response.json();
+            } catch (e) {
+                return {}; // Retorna um objeto vazio se não houver conteúdo JSON
             }
-
-            return await response.json();
         } catch (error) {
             console.error('API Error:', error);
             throw error;
@@ -73,7 +71,7 @@ class ApiService {
     // ===== AUTENTICAÇÃO =====
     
     async register(userData) {
-        return this.request('/auth/register', {
+        return this.request('auth/register', {
             method: 'POST',
             body: JSON.stringify(userData),
         });
@@ -85,7 +83,7 @@ class ApiService {
         formData.append('password', password);
 
         // O endpoint de login espera 'x-www-form-urlencoded', então não usamos o header padrão
-        const data = await this.request('/auth/login', {
+        const data = await this.request('auth/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -102,35 +100,35 @@ class ApiService {
     }
 
     async getCurrentUser() {
-        return this.request('/auth/me');
+        return this.request('auth/me');
     }
 
     // ===== CATEGORIAS =====
     
     async getCategories() {
-        return this.request('/categories/');
+        return this.request('categories/');
     }
 
     async getCategory(id) {
-        return this.request(`/categories/${id}`);
+        return this.request(`categories/${id}`);
     }
 
     async createCategory(categoryData) {
-        return this.request('/categories/', {
+        return this.request('categories/', {
             method: 'POST',
             body: JSON.stringify(categoryData),
         });
     }
 
     async updateCategory(id, categoryData) {
-        return this.request(`/categories/${id}`, {
+        return this.request(`categories/${id}`, {
             method: 'PUT',
             body: JSON.stringify(categoryData),
         });
     }
 
     async deleteCategory(id) {
-        return this.request(`/categories/${id}`, {
+        return this.request(`categories/${id}`, {
             method: 'DELETE',
         });
     }
@@ -145,13 +143,13 @@ class ApiService {
         if (category_id) params.append('category_id', category_id);
         
         const queryString = params.toString();
-        const endpoint = `/products/${queryString ? `?${queryString}` : ''}`;
+        const endpoint = `products/${queryString ? `?${queryString}` : ''}`;
         
         return this.request(endpoint);
     }
 
     async getProduct(id) {
-        return this.request(`/products/${id}`);
+        return this.request(`products/${id}`);
     }
 
     async createProduct(productData) {
@@ -168,7 +166,7 @@ class ApiService {
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
 
-        return this.request('/products/', {
+        return this.request('products/', {
             method: 'POST',
             body: JSON.stringify(formattedData),
         });
@@ -188,20 +186,20 @@ class ApiService {
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
 
-        return this.request(`/products/${id}`, {
+        return this.request(`products/${id}`, {
             method: 'PUT',
             body: JSON.stringify(formattedData),
         });
     }
 
     async deleteProduct(id) {
-        return this.request(`/products/${id}`, {
+        return this.request(`products/${id}`, {
             method: 'DELETE',
         });
     }
 
     async deleteAllProducts() {
-        return this.request('/products/delete-all', {
+        return this.request('products/delete-all', {
             method: 'DELETE',
         });
     }
@@ -209,29 +207,29 @@ class ApiService {
     // ===== FUNCIONÁRIOS =====
     
     async getEmployees() {
-        return this.request('/employees/');
+        return this.request('employees/');
     }
 
     async getEmployee(id) {
-        return this.request(`/employees/${id}`);
+        return this.request(`employees/${id}`);
     }
 
     async createEmployee(employeeData) {
-        return this.request('/employees/', {
+        return this.request('employees/', {
             method: 'POST',
             body: JSON.stringify(employeeData),
         });
     }
 
     async updateEmployee(id, employeeData) {
-        return this.request(`/employees/${id}`, {
+        return this.request(`employees/${id}`, {
             method: 'PUT',
             body: JSON.stringify(employeeData),
         });
     }
 
     async deleteEmployee(id) {
-        return this.request(`/employees/${id}`, {
+        return this.request(`employees/${id}`, {
             method: 'DELETE',
         });
     }
@@ -239,31 +237,31 @@ class ApiService {
     // ===== VENDAS =====
     
     async getSales() {
-        return this.request('/sales/');
+        return this.request('sales/');
     }
 
     async getSale(id) {
-        return this.request(`/sales/${id}`);
+        return this.request(`sales/${id}`);
     }
 
     async createSale(saleData) {
         // Remover referência ao cliente se existir
         const { customer_id, ...saleDataSemCliente } = saleData;
-        return this.request('/sales/', {
+        return this.request('sales/', {
             method: 'POST',
             body: JSON.stringify(saleDataSemCliente),
         });
     }
 
     async updateSale(id, saleData) {
-        return this.request(`/sales/${id}`, {
+        return this.request(`sales/${id}`, {
             method: 'PUT',
             body: JSON.stringify(saleData),
         });
     }
 
     async deleteSale(id) {
-        return this.request(`/sales/${id}`, {
+        return this.request(`sales/${id}`, {
             method: 'DELETE',
         });
     }
@@ -271,15 +269,15 @@ class ApiService {
     // ===== INVENTÁRIO =====
     
     async getInventoryMovements() {
-        return this.request('/inventory/');
+        return this.request('inventory/');
     }
 
     async getInventoryMovement(id) {
-        return this.request(`/inventory/${id}`);
+        return this.request(`inventory/${id}`);
     }
 
     async createInventoryMovement(movementData) {
-        return this.request('/inventory/', {
+        return this.request('inventory/', {
             method: 'POST',
             body: JSON.stringify(movementData),
         });
@@ -288,29 +286,29 @@ class ApiService {
     // ===== USUÁRIOS =====
     
     async getUsers() {
-        return this.request('/users/');
+        return this.request('users/');
     }
 
     async getUser(id) {
-        return this.request(`/users/${id}`);
+        return this.request(`users/${id}`);
     }
 
     async createUser(userData) {
-        return this.request('/users/', {
+        return this.request('users/', {
             method: 'POST',
             body: JSON.stringify(userData),
         });
     }
 
     async updateUser(id, userData) {
-        return this.request(`/users/${id}`, {
+        return this.request(`users/${id}`, {
             method: 'PUT',
             body: JSON.stringify(userData),
         });
     }
 
     async deleteUser(id) {
-        return this.request(`/users/${id}`, {
+        return this.request(`users/${id}`, {
             method: 'DELETE',
         });
     }
@@ -318,7 +316,7 @@ class ApiService {
     // ===== IMPRESSÃO =====
     
     async printReceipt(saleId) {
-        return this.request(`/sales/${saleId}/print`, {
+        return this.request(`sales/${saleId}/print`, {
             method: 'POST',
         });
     }

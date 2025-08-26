@@ -12,12 +12,16 @@ import {
   Check,
   AlertTriangle,
   Info,
-  Download
+  Download,
+  User as UserIcon
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import UserProfile from '../components/UserProfile';
 
 const Configuracoes = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('empresa');
+  const [activeTab, setActiveTab] = useState('perfil');
   const [editMode, setEditMode] = useState({});
   
   const [empresa, setEmpresa] = useState({
@@ -70,427 +74,338 @@ const Configuracoes = () => {
   };
 
   const tabs = [
-    { id: 'empresa', name: 'Empresa', icon: Building2 },
-    { id: 'sistema', name: 'Sistema', icon: Settings },
-    { id: 'backup', name: 'Backup', icon: Database },
-    { id: 'seguranca', name: 'Segurança', icon: Shield }
+    { id: 'perfil', name: 'Meu Perfil', icon: <UserIcon size={18} /> },
+    { id: 'empresa', name: 'Empresa', icon: <Building2 size={18} /> },
+    { id: 'sistema', name: 'Sistema', icon: <Settings size={18} /> },
+    { id: 'backup', name: 'Backup', icon: <Database size={18} /> },
+    { id: 'seguranca', name: 'Segurança', icon: <Shield size={18} /> },
+    { id: 'usuarios', name: 'Usuários', icon: <Users size={18} /> },
+    { id: 'notificacoes', name: 'Notificações', icon: <Bell size={18} /> },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4 lg:space-y-6">
-      {/* Header */}
-      <div className="px-4 lg:px-0">
-        <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-sm lg:text-base text-gray-600">Gerencie as configurações do sistema</p>
-      </div>
-
-      {/* Tabs Navigation */}
-      <div className="px-4 lg:px-0">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'perfil':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-800">Meu Perfil</h2>
+            <div className="max-w-2xl">
+              <UserProfile user={user} />
+            </div>
+          </div>
+        );
+      case 'empresa':
+        return (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold text-gray-800">Informações da Empresa</h2>
+              {!editMode.empresa ? (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                    activeTab === tab.id
-                      ? 'border-blue-900 text-blue-900'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  onClick={() => setEditMode({...editMode, empresa: true})}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {tab.name}
+                  <Edit size={16} className="mr-2" />
+                  Editar
                 </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="px-4 lg:px-0">
-        {/* Empresa */}
-        {activeTab === 'empresa' && (
-          <div className="bg-white rounded-lg shadow-sm lg:shadow">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base lg:text-lg font-medium text-gray-900">Informações da Empresa</h3>
-                {!editMode.empresa ? (
+              ) : (
+                <div className="space-x-2">
                   <button
-                    onClick={() => handleEdit('empresa')}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setEditMode({...editMode, empresa: false})}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Editar
+                    <X size={16} className="mr-2" />
+                    Cancelar
                   </button>
-                ) : (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleSave('empresa')}
-                      className="inline-flex items-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 transition-colors"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Salvar
-                    </button>
-                    <button
-                      onClick={() => handleCancel('empresa')}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancelar
-                    </button>
-                  </div>
-                )}
-              </div>
+                  <button
+                    onClick={() => {
+                      // Lógica para salvar as alterações
+                      setEditMode({...editMode, empresa: false});
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <Save size={16} className="mr-2" />
+                    Salvar Alterações
+                  </button>
+                </div>
+              )}
             </div>
             
-            <div className="p-4 lg:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome da Empresa
-                  </label>
-                  {editMode.empresa ? (
+            {/* Formulário de edição da empresa */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                  <div className="sm:col-span-4">
+                    <label htmlFor="nome-empresa" className="block text-sm font-medium text-gray-700">
+                      Nome da Empresa
+                    </label>
                     <input
                       type="text"
-                      value={empresa.nome}
-                      onChange={(e) => setEmpresa({...empresa, nome: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      name="nome-empresa"
+                      id="nome-empresa"
+                      disabled={!editMode.empresa}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      defaultValue={empresa.nome}
                     />
-                  ) : (
-                    <p className="text-sm text-gray-900">{empresa.nome}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    NUIT
-                  </label>
-                  {editMode.empresa ? (
-                    <input
-                      type="text"
-                      value={empresa.nuit}
-                      onChange={(e) => setEmpresa({...empresa, nuit: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900">{empresa.nuit}</p>
-                  )}
-                </div>
-
-                <div className="lg:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Endereço
-                  </label>
-                  {editMode.empresa ? (
-                    <input
-                      type="text"
-                      value={empresa.endereco}
-                      onChange={(e) => setEmpresa({...empresa, endereco: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900">{empresa.endereco}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Telefone
-                  </label>
-                  {editMode.empresa ? (
-                    <input
-                      type="tel"
-                      value={empresa.telefone}
-                      onChange={(e) => setEmpresa({...empresa, telefone: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-900">{empresa.telefone}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  {editMode.empresa ? (
+                  </div>
+                  
+                  <div className="sm:col-span-4">
+                    <label htmlFor="email-empresa" className="block text-sm font-medium text-gray-700">
+                      Email
+                    </label>
                     <input
                       type="email"
-                      value={empresa.email}
-                      onChange={(e) => setEmpresa({...empresa, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      name="email-empresa"
+                      id="email-empresa"
+                      disabled={!editMode.empresa}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      defaultValue={empresa.email}
                     />
-                  ) : (
-                    <p className="text-sm text-gray-900">{empresa.email}</p>
-                  )}
+                  </div>
+                  
+                  {/* Outros campos do formulário... */}
                 </div>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Sistema */}
-        {activeTab === 'sistema' && (
-          <div className="bg-white rounded-lg shadow-sm lg:shadow">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base lg:text-lg font-medium text-gray-900">Configurações do Sistema</h3>
-                {!editMode.sistema ? (
+        );
+      
+      case 'sistema':
+        return (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold text-gray-800">Configurações do Sistema</h2>
+              {!editMode.sistema ? (
+                <button
+                  onClick={() => setEditMode({...editMode, sistema: true})}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <Edit size={16} className="mr-2" />
+                  Editar
+                </button>
+              ) : (
+                <div className="space-x-2">
                   <button
-                    onClick={() => handleEdit('sistema')}
-                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setEditMode({...editMode, sistema: false})}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Editar
+                    <X size={16} className="mr-2" />
+                    Cancelar
                   </button>
-                ) : (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleSave('sistema')}
-                      className="inline-flex items-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 transition-colors"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Salvar
-                    </button>
-                    <button
-                      onClick={() => handleCancel('sistema')}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      Cancelar
-                    </button>
-                  </div>
-                )}
-              </div>
+                  <button
+                    onClick={() => {
+                      // Lógica para salvar as alterações
+                      setEditMode({...editMode, sistema: false});
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <Save size={16} className="mr-2" />
+                    Salvar Alterações
+                  </button>
+                </div>
+              )}
             </div>
             
-            <div className="p-4 lg:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Moeda
-                  </label>
-                  {editMode.sistema ? (
+            {/* Formulário de edição do sistema */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                  <div className="sm:col-span-4">
+                    <label htmlFor="moeda" className="block text-sm font-medium text-gray-700">
+                      Moeda
+                    </label>
                     <select
-                      value={sistema.moeda}
-                      onChange={(e) => setSistema({...sistema, moeda: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      id="moeda"
+                      name="moeda"
+                      disabled={!editMode.sistema}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
                       <option value="MT">Metical (MT)</option>
                       <option value="USD">Dólar (USD)</option>
                       <option value="EUR">Euro (EUR)</option>
                     </select>
-                  ) : (
-                    <p className="text-sm text-gray-900">{sistema.moeda}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Idioma
-                  </label>
-                  {editMode.sistema ? (
+                  </div>
+                  
+                  <div className="sm:col-span-4">
+                    <label htmlFor="idioma" className="block text-sm font-medium text-gray-700">
+                      Idioma
+                    </label>
                     <select
-                      value={sistema.idioma}
-                      onChange={(e) => setSistema({...sistema, idioma: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      id="idioma"
+                      name="idioma"
+                      disabled={!editMode.sistema}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     >
                       <option value="pt-MZ">Português (Moçambique)</option>
                       <option value="en">English</option>
                     </select>
-                  ) : (
-                    <p className="text-sm text-gray-900">{sistema.idioma}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fuso Horário
-                  </label>
-                  {editMode.sistema ? (
-                    <select
-                      value={sistema.fusoHorario}
-                      onChange={(e) => setSistema({...sistema, fusoHorario: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="Africa/Maputo">Maputo (GMT+2)</option>
-                      <option value="Africa/Lagos">Lagos (GMT+1)</option>
-                    </select>
-                  ) : (
-                    <p className="text-sm text-gray-900">{sistema.fusoHorario}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Formato de Data
-                  </label>
-                  {editMode.sistema ? (
-                    <select
-                      value={sistema.formatoData}
-                      onChange={(e) => setSistema({...sistema, formatoData: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                    </select>
-                  ) : (
-                    <p className="text-sm text-gray-900">{sistema.formatoData}</p>
-                  )}
-                </div>
-
-                <div className="lg:col-span-2">
-                  <div className="space-y-3">
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={sistema.backupAutomatico}
-                        onChange={(e) => setSistema({...sistema, backupAutomatico: e.target.checked})}
-                        disabled={!editMode.sistema}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Backup Automático</span>
-                    </label>
-                    
-                    <label className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={sistema.notificacoes}
-                        onChange={(e) => setSistema({...sistema, notificacoes: e.target.checked})}
-                        disabled={!editMode.sistema}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Notificações do Sistema</span>
-                    </label>
                   </div>
+                  
+                  {/* Outros campos do formulário... */}
                 </div>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Backup */}
-        {activeTab === 'backup' && (
-          <div className="bg-white rounded-lg shadow-sm lg:shadow">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-base lg:text-lg font-medium text-gray-900">Configurações de Backup</h3>
-            </div>
+        );
+      
+      case 'backup':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-800">Configurações de Backup</h2>
             
-            <div className="p-4 lg:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <div className="flex items-center mb-3">
-                    <Database className="h-5 w-5 text-blue-600 mr-2" />
-                    <h4 className="text-sm font-medium text-blue-900">Último Backup</h4>
+            {/* Conteúdo da aba de backup */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                  <div className="sm:col-span-4">
+                    <label htmlFor="ultimo-backup" className="block text-sm font-medium text-gray-700">
+                      Último Backup
+                    </label>
+                    <p id="ultimo-backup" className="mt-1 text-sm text-gray-500">{backup.ultimoBackup}</p>
                   </div>
-                  <p className="text-sm text-blue-700">{backup.ultimoBackup}</p>
-                </div>
-
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <div className="flex items-center mb-3">
-                    <Check className="h-5 w-5 text-green-600 mr-2" />
-                    <h4 className="text-sm font-medium text-green-900">Próximo Backup</h4>
+                  
+                  <div className="sm:col-span-4">
+                    <label htmlFor="proximo-backup" className="block text-sm font-medium text-gray-700">
+                      Próximo Backup
+                    </label>
+                    <p id="proximo-backup" className="mt-1 text-sm text-gray-500">{backup.proximoBackup}</p>
                   </div>
-                  <p className="text-sm text-green-700">{backup.proximoBackup}</p>
+                  
+                  {/* Outros campos do formulário... */}
                 </div>
-
-                <div className="p-4 bg-yellow-50 rounded-lg">
-                  <div className="flex items-center mb-3">
-                    <Info className="h-5 w-5 text-yellow-600 mr-2" />
-                    <h4 className="text-sm font-medium text-yellow-900">Tamanho</h4>
-                  </div>
-                  <p className="text-sm text-yellow-700">{backup.tamanhoBackup}</p>
-                </div>
-
-                <div className="p-4 bg-purple-50 rounded-lg">
-                  <div className="flex items-center mb-3">
-                    <Shield className="h-5 w-5 text-purple-600 mr-2" />
-                    <h4 className="text-sm font-medium text-purple-900">Retenção</h4>
-                  </div>
-                  <p className="text-sm text-purple-700">{backup.retencao}</p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-900 hover:bg-blue-800 transition-colors">
-                  <Database className="h-4 w-4 mr-2" />
-                  Fazer Backup Manual
-                </button>
-                <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Download className="h-4 w-4 mr-2" />
-                  Restaurar Backup
-                </button>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Segurança */}
-        {activeTab === 'seguranca' && (
-          <div className="bg-white rounded-lg shadow-sm lg:shadow">
-            <div className="px-4 lg:px-6 py-4 border-b border-gray-200">
-              <h3 className="text-base lg:text-lg font-medium text-gray-900">Configurações de Segurança</h3>
-            </div>
+        );
+      
+      case 'seguranca':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-800">Configurações de Segurança</h2>
             
-            <div className="p-4 lg:p-6">
-              <div className="space-y-6">
-                <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 mr-3" />
-                    <div>
-                      <h4 className="text-sm font-medium text-yellow-900">Alterar Senha</h4>
-                      <p className="text-sm text-yellow-700">Recomendamos alterar sua senha regularmente</p>
-                    </div>
+            {/* Conteúdo da aba de segurança */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                  <div className="sm:col-span-4">
+                    <label htmlFor="senha" className="block text-sm font-medium text-gray-700">
+                      Senha
+                    </label>
+                    <input
+                      type="password"
+                      id="senha"
+                      name="senha"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    />
                   </div>
-                  <button className="mt-3 inline-flex items-center px-3 py-2 border border-yellow-300 rounded-md text-sm font-medium text-yellow-700 hover:bg-yellow-100 transition-colors">
-                    Alterar Senha
-                  </button>
-                </div>
-
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center">
-                    <Shield className="h-5 w-5 text-blue-600 mr-3" />
-                    <div>
-                      <h4 className="text-sm font-medium text-blue-900">Autenticação de Dois Fatores</h4>
-                      <p className="text-sm text-blue-700">Adicione uma camada extra de segurança</p>
-                    </div>
-                  </div>
-                  <button className="mt-3 inline-flex items-center px-3 py-2 border border-blue-300 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors">
-                    Configurar 2FA
-                  </button>
-                </div>
-
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <div className="flex items-center">
-                    <Check className="h-5 w-5 text-green-600 mr-3" />
-                    <div>
-                      <h4 className="text-sm font-medium text-green-900">Sessões Ativas</h4>
-                      <p className="text-sm text-green-700">Gerencie suas sessões de login</p>
-                    </div>
-                  </div>
-                  <button className="mt-3 inline-flex items-center px-3 py-2 border border-green-300 rounded-md text-sm font-medium text-green-700 hover:bg-green-100 transition-colors">
-                    Ver Sessões
-                  </button>
+                  
+                  {/* Outros campos do formulário... */}
                 </div>
               </div>
             </div>
           </div>
-        )}
+        );
+      
+      case 'usuarios':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-800">Usuários</h2>
+            
+            {/* Conteúdo da aba de usuários */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                  <div className="sm:col-span-4">
+                    <label htmlFor="nome-usuario" className="block text-sm font-medium text-gray-700">
+                      Nome do Usuário
+                    </label>
+                    <input
+                      type="text"
+                      id="nome-usuario"
+                      name="nome-usuario"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    />
+                  </div>
+                  
+                  {/* Outros campos do formulário... */}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 'notificacoes':
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-gray-800">Notificações</h2>
+            
+            {/* Conteúdo da aba de notificações */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                  <div className="sm:col-span-4">
+                    <label htmlFor="notificacoes-email" className="block text-sm font-medium text-gray-700">
+                      Notificações por Email
+                    </label>
+                    <input
+                      type="email"
+                      id="notificacoes-email"
+                      name="notificacoes-email"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    />
+                  </div>
+                  
+                  {/* Outros campos do formulário... */}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      
+      default:
+        return (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900">Selecione uma opção</h3>
+            <p className="mt-1 text-sm text-gray-500">Escolha uma categoria no menu ao lado para começar.</p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Configurações</h1>
+        
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Barra lateral de navegação */}
+          <nav className="md:w-64 flex-shrink-0">
+            <ul className="space-y-1">
+              {tabs.map((tab) => (
+                <li key={tab.id}>
+                  <button
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md ${
+                      activeTab === tab.id
+                        ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
+                    }`}
+                  >
+                    <span className="mr-3">{tab.icon}</span>
+                    {tab.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          
+          {/* Conteúdo principal */}
+          <div className="flex-1">
+            {renderTabContent()}
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-export default Configuracoes; 
+export default Configuracoes;
