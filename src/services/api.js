@@ -6,6 +6,7 @@ class ApiService {
     constructor() {
         this.baseURL = API_BASE_URL;
         this.token = localStorage.getItem('token');
+        this.apiPrefix = '/api/v0';
     }
 
     // Configurar headers com token de autenticação
@@ -35,7 +36,10 @@ class ApiService {
 
     // Função genérica para fazer requisições
     async request(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
+        // Garante que o endpoint comece com / e adiciona o prefixo da API
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const url = `${this.baseURL}${this.apiPrefix}${normalizedEndpoint}`;
+        
         const config = {
             headers: this.getHeaders(),
             ...options,
@@ -45,7 +49,6 @@ class ApiService {
             const response = await fetch(url, config);
             
             if (response.status === 401) {
-                // Token expirado ou inválido
                 this.removeToken();
                 window.location.href = '/login';
                 return;
@@ -56,7 +59,6 @@ class ApiService {
                 throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
             }
 
-            // Para respostas 204 No Content, retornar objeto vazio em vez de tentar parsear JSON
             if (response.status === 204) {
                 return {};
             }
@@ -70,12 +72,29 @@ class ApiService {
 
     // ===== AUTENTICAÇÃO =====
     
+    async register(userData) {
+        const response = await fetch(`${this.baseURL}${this.apiPrefix}/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(userData),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Falha no registro');
+        }
+
+        return await response.json();
+    }
+
     async login(username, password) {
         const formData = new URLSearchParams();
         formData.append('username', username);
         formData.append('password', password);
 
-        const response = await fetch(`${this.baseURL}/auth/login`, {
+        const response = await fetch(`${this.baseURL}${this.apiPrefix}/auth/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -133,8 +152,17 @@ class ApiService {
 
     // ===== PRODUTOS =====
     
-    async getProducts() {
-        return this.request('/products/');
+    async getProducts({ skip = 0, limit = 10, search = '', category_id } = {}) {
+        const params = new URLSearchParams();
+        if (skip) params.append('skip', skip);
+        if (limit) params.append('limit', limit);
+        if (search) params.append('search', search);
+        if (category_id) params.append('category_id', category_id);
+        
+        const queryString = params.toString();
+        const endpoint = `/products/${queryString ? `?${queryString}` : ''}`;
+        
+        return this.request(endpoint);
     }
 
     async getProduct(id) {
@@ -142,16 +170,42 @@ class ApiService {
     }
 
     async createProduct(productData) {
+        // Garantir que os dados estejam no formato correto
+        const formattedData = {
+            name: productData.name,
+            description: productData.description || null,
+            sku: productData.sku || null,
+            cost_price: parseFloat(productData.cost_price) || 0,
+            sale_price: parseFloat(productData.sale_price) || 0,
+            current_stock: parseInt(productData.current_stock) || 0,
+            min_stock: parseInt(productData.min_stock) || 0,
+            category_id: productData.category_id || null,
+            venda_por_peso: Boolean(productData.venda_por_peso)
+        };
+
         return this.request('/products/', {
             method: 'POST',
-            body: JSON.stringify(productData),
+            body: JSON.stringify(formattedData),
         });
     }
 
     async updateProduct(id, productData) {
+        // Garantir que os dados estejam no formato correto
+        const formattedData = {
+            name: productData.name,
+            description: productData.description || null,
+            sku: productData.sku || null,
+            cost_price: parseFloat(productData.cost_price) || 0,
+            sale_price: parseFloat(productData.sale_price) || 0,
+            current_stock: parseInt(productData.current_stock) || 0,
+            min_stock: parseInt(productData.min_stock) || 0,
+            category_id: productData.category_id || null,
+            venda_por_peso: Boolean(productData.venda_por_peso)
+        };
+
         return this.request(`/products/${id}`, {
             method: 'PUT',
-            body: JSON.stringify(productData),
+            body: JSON.stringify(formattedData),
         });
     }
 
@@ -197,36 +251,6 @@ class ApiService {
         });
     }
 
-    // ===== CLIENTES =====
-    
-    async getCustomers() {
-        return this.request('/customers/');
-    }
-
-    async getCustomer(id) {
-        return this.request(`/customers/${id}`);
-    }
-
-    async createCustomer(customerData) {
-        return this.request('/customers/', {
-            method: 'POST',
-            body: JSON.stringify(customerData),
-        });
-    }
-
-    async updateCustomer(id, customerData) {
-        return this.request(`/customers/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(customerData),
-        });
-    }
-
-    async deleteCustomer(id) {
-        return this.request(`/customers/${id}`, {
-            method: 'DELETE',
-        });
-    }
-
     // ===== VENDAS =====
     
     async getSales() {
@@ -238,9 +262,11 @@ class ApiService {
     }
 
     async createSale(saleData) {
+        // Remover referência ao cliente se existir
+        const { customer_id, ...saleDataSemCliente } = saleData;
         return this.request('/sales/', {
             method: 'POST',
-            body: JSON.stringify(saleData),
+            body: JSON.stringify(saleDataSemCliente),
         });
     }
 
@@ -301,6 +327,14 @@ class ApiService {
     async deleteUser(id) {
         return this.request(`/users/${id}`, {
             method: 'DELETE',
+        });
+    }
+
+    // ===== IMPRESSÃO =====
+    
+    async printReceipt(saleId) {
+        return this.request(`/sales/${saleId}/print`, {
+            method: 'POST',
         });
     }
 }

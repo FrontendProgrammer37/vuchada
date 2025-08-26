@@ -7,6 +7,8 @@ import Produtos from './pages/Produtos';
 import Funcionarios from './pages/Funcionarios';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
+import TodasVendas from './pages/TodasVendas';
+import EfetuarVendaPDV from './pages/EfetuarVendaPDV';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -91,6 +93,27 @@ const AppContent = () => {
           <ProtectedRoute>
             <Layout>
               <Configuracoes />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/efetuarvenda"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <EfetuarVendaPDV />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/todasvendas"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TodasVendas />
             </Layout>
           </ProtectedRoute>
         }
