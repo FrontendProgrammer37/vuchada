@@ -11,9 +11,7 @@ import {
   Settings, 
   LogOut,
   ChevronDown,
-  User,
-  ShoppingCart,
-  ListOrdered
+  User
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -24,8 +22,6 @@ const Layout = ({ children }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Efetuar Venda', href: '/efetuarvenda', icon: ShoppingCart },
-    { name: 'Todas Vendas', href: '/todasvendas', icon: ListOrdered },
     { name: 'Produtos', href: '/produtos', icon: Package },
     { name: 'Funcionários', href: '/funcionarios', icon: Users },
     { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
@@ -181,4 +177,4 @@ const Layout = ({ children }) => {
   );
 };
 
-export default Layout;
+export default Layout; 

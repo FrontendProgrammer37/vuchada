@@ -19,11 +19,11 @@ const Produtos = () => {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        sku: '',
+        codigo: '',
         cost_price: '',
         sale_price: '',
-        current_stock: '0',
-        min_stock: '0',
+        current_stock: '',
+        min_stock: '',
         category_id: '',
         venda_por_peso: false
     });
@@ -64,26 +64,26 @@ const Produtos = () => {
         if (product) {
             setEditingProduct(product);
             setFormData({
-                name: product.name || '',
+                name: product.name,
                 description: product.description || '',
-                sku: product.sku || '',
-                cost_price: product.cost_price || '',
-                sale_price: product.sale_price || '',
-                current_stock: product.current_stock?.toString() || '0',
-                min_stock: product.min_stock?.toString() || '0',
+                codigo: product.sku || '',
+                cost_price: product.cost_price,
+                sale_price: product.sale_price,
+                current_stock: product.current_stock,
+                min_stock: product.min_stock,
                 category_id: product.category_id || '',
-                venda_por_peso: product.venda_por_peso || false
+                venda_por_peso: product.venda_por_peso
             });
         } else {
             setEditingProduct(null);
             setFormData({
                 name: '',
                 description: '',
-                sku: '',
+                codigo: '',
                 cost_price: '',
                 sale_price: '',
-                current_stock: '0',
-                min_stock: '0',
+                current_stock: '',
+                min_stock: '',
                 category_id: '',
                 venda_por_peso: false
             });
@@ -99,11 +99,15 @@ const Produtos = () => {
             name: '',
             description: '',
             sku: '',
+            barcode: '',
             cost_price: '',
             sale_price: '',
-            current_stock: '0',
-            min_stock: '0',
+            wholesale_price: '',
+            current_stock: '',
+            min_stock: '',
+            max_stock: '',
             category_id: '',
+            is_service: false,
             venda_por_peso: false
         });
     };
@@ -114,11 +118,11 @@ const Produtos = () => {
             const productData = {
                 name: formData.name,
                 description: formData.description || null,
-                sku: formData.sku,
-                cost_price: parseFloat(formData.cost_price) || 0,
-                sale_price: parseFloat(formData.sale_price) || 0,
-                current_stock: parseInt(formData.current_stock) || 0,
-                min_stock: parseInt(formData.min_stock) || 0,
+                sku: formData.codigo, // Código do desktop mapeado para SKU da API
+                cost_price: parseFloat(formData.cost_price),
+                sale_price: parseFloat(formData.sale_price),
+                current_stock: parseInt(formData.current_stock),
+                min_stock: parseInt(formData.min_stock),
                 category_id: formData.category_id ? parseInt(formData.category_id) : null,
                 venda_por_peso: !!formData.venda_por_peso
             };
@@ -132,7 +136,7 @@ const Produtos = () => {
             closeModal();
             loadData(); // Recarregar dados
         } catch (err) {
-            setError('Erro ao salvar produto: ' + (err.message || 'Erro desconhecido'));
+            setError('Erro ao salvar produto: ' + err.message);
         }
     };
 
@@ -492,15 +496,14 @@ const Produtos = () => {
                                     {/* Código (desktop) */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Código (SKU) *
+                                            Código *
                                         </label>
                                         <input
                                             type="text"
-                                            id="sku"
-                                            value={formData.sku}
-                                            onChange={(e) => setFormData({...formData, sku: e.target.value})}
-                                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                                             required
+                                            value={formData.codigo}
+                                            onChange={(e) => setFormData({...formData, codigo: e.target.value})}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         />
                                     </div>
 

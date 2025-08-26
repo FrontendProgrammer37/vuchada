@@ -26,6 +26,7 @@ const Relatorios = () => {
   const [stats, setStats] = useState({
     vendasTotal: 0,
     receitaTotal: 0,
+    clientesAtendidos: 0,
     produtosVendidos: 0,
     ticketMedio: 0,
     crescimentoVendas: 0,
@@ -79,15 +80,17 @@ const Relatorios = () => {
     try {
       setLoading(true);
       setError(null);
-      const [sales, products, categories] = await Promise.all([
+      const [sales, products, customers, categories] = await Promise.all([
         apiService.getSales(),
         apiService.getProducts(),
+        apiService.getCustomers(),
         apiService.getCategories()
       ]);
 
       const salesFiltered = sales.filter(s => s.created_at && isWithinRange(new Date(s.created_at)));
       const vendasTotal = salesFiltered.length;
       const receitaTotal = salesFiltered.reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
+      const clientesAtendidos = new Set(salesFiltered.map(s => s.customer_id).filter(Boolean)).size;
       const produtosVendidos = salesFiltered.reduce((acc, _s) => acc + 1, 0); // sem itens, usamos o número de vendas como aproximação
       const ticketMedio = vendasTotal ? receitaTotal / vendasTotal : 0;
 
@@ -123,6 +126,7 @@ const Relatorios = () => {
       setStats({
         vendasTotal,
         receitaTotal,
+        clientesAtendidos,
         produtosVendidos,
         ticketMedio,
         crescimentoVendas: 0,
@@ -273,7 +277,10 @@ const Relatorios = () => {
               <p className="text-sm text-blue-100">Receita</p>
               <p className="text-lg lg:text-xl font-bold">{formatCurrency(stats.receitaTotal)}</p>
             </div>
-
+            <div className="text-center">
+              <p className="text-sm text-blue-100">Clientes</p>
+              <p className="text-2xl lg:text-3xl font-bold">{stats.clientesAtendidos}</p>
+            </div>
             <div className="text-center">
               <p className="text-sm text-blue-100">Ticket Médio</p>
               <p className="text-lg lg:text-xl font-bold">{formatCurrency(stats.ticketMedio)}</p>
@@ -381,4 +388,4 @@ const Relatorios = () => {
   );
 };
 
-export default Relatorios;
+export default Relatorios; 
