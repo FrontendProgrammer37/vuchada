@@ -402,7 +402,7 @@ const Configuracoes = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Cabeçalho mobile */}
-      <div className="md:hidden bg-white shadow-sm sticky top-0 z-40">
+      <div className="md:hidden bg-white shadow-sm fixed top-0 left-0 right-0 z-40">
         <div className="px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-gray-900">Configurações</h1>
           <button
@@ -417,106 +417,101 @@ const Configuracoes = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
-        <h1 className="hidden md:block text-2xl font-bold text-gray-900 mb-6">Configurações</h1>
-        
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Menu lateral para desktop */}
-          <aside className="hidden md:block w-64 flex-shrink-0">
-            <nav>
-              <ul className="space-y-1">
-                {tabs.map((tab) => (
-                  <li key={tab.id}>
-                    <button
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                        activeTab === tab.id
-                          ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
-                      }`}
-                    >
-                      <span className="mr-3">{tab.icon}</span>
-                      {tab.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </aside>
-
-          {/* Menu lateral móvel */}
-          <div 
-            id="mobile-menu"
-            className={`fixed inset-0 z-30 md:hidden transition-opacity duration-300 ease-in-out ${
-              isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-            aria-hidden={!isMobileMenuOpen}
-          >
-            {/* Overlay escuro com transição suave */}
-            <div 
-              className={`fixed inset-0 bg-black transition-opacity duration-300 ${
-                isMobileMenuOpen ? 'opacity-50' : 'opacity-0'
-              }`}
-              onClick={() => setIsMobileMenuOpen(false)}
-              aria-hidden="true"
-            />
-            
-            {/* Menu deslizante */}
-            <div 
-              className={`fixed inset-y-0 left-0 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
-                isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-              }`}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Menu de navegação"
-            >
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-lg font-medium">Menu</h2>
-                <button 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2 -mr-2 rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  aria-label="Fechar menu"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <nav className="p-2 h-[calc(100%-57px)] overflow-y-auto">
+      {/* Adiciona padding no topo para compensar a barra fixa */}
+      <div className="pt-16 md:pt-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+          <h1 className="hidden md:block text-2xl font-bold text-gray-900 mb-6">Configurações</h1>
+          
+          <div className="flex flex-col md:flex-row gap-6">
+            {/* Menu lateral para desktop */}
+            <aside className="hidden md:block w-64 flex-shrink-0">
+              <nav>
                 <ul className="space-y-1">
                   {tabs.map((tab) => (
                     <li key={tab.id}>
                       <button
-                        onClick={() => {
-                          setActiveTab(tab.id);
-                          setIsMobileMenuOpen(false);
-                        }}
+                        onClick={() => setActiveTab(tab.id)}
                         className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
                           activeTab === tab.id
-                            ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-500'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
                         }`}
-                        aria-current={activeTab === tab.id ? 'page' : undefined}
                       >
                         <span className="mr-3">{tab.icon}</span>
                         {tab.name}
-                        {activeTab === tab.id && (
-                          <span className="ml-auto text-blue-500">
-                            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                          </span>
-                        )}
                       </button>
                     </li>
                   ))}
                 </ul>
               </nav>
+            </aside>
+
+            {/* Menu lateral móvel */}
+            <div 
+              id="mobile-menu"
+              className={`fixed inset-0 z-50 md:hidden transition-opacity duration-300 ease-in-out ${
+                isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
+              aria-hidden={!isMobileMenuOpen}
+            >
+              {/* Overlay escuro com transição suave */}
+              <div 
+                className={`fixed inset-0 bg-black transition-opacity duration-300 ${
+                  isMobileMenuOpen ? 'opacity-50' : 'opacity-0'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-hidden="true"
+              />
+              
+              {/* Menu deslizante */}
+              <div 
+                className="fixed inset-y-0 left-0 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out h-full overflow-y-auto"
+                style={{
+                  transform: isMobileMenuOpen ? 'translateX(0)' : 'translateX(-100%)',
+                  paddingTop: '60px' // Altura da barra de título
+                }}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Menu de navegação"
+              >
+                <nav>
+                  <ul className="space-y-1 p-2">
+                    {tabs.map((tab) => (
+                      <li key={tab.id}>
+                        <button
+                          onClick={() => {
+                            setActiveTab(tab.id);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                            activeTab === tab.id
+                              ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-500'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          }`}
+                          aria-current={activeTab === tab.id ? 'page' : undefined}
+                        >
+                          <span className="mr-3">{tab.icon}</span>
+                          {tab.name}
+                          {activeTab === tab.id && (
+                            <span className="ml-auto text-blue-500">
+                              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              </div>
             </div>
+            
+            {/* Conteúdo principal */}
+            <main className="flex-1 bg-white rounded-lg shadow-sm p-4 md:p-6 mt-4 md:mt-0">
+              {renderTabContent()}
+            </main>
           </div>
-          
-          {/* Conteúdo principal */}
-          <main className="flex-1 bg-white rounded-lg shadow-sm p-4 md:p-6">
-            {renderTabContent()}
-          </main>
         </div>
       </div>
     </div>
