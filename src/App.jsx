@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -143,6 +145,7 @@ const App = () => {
     <Router>
       <AuthProvider>
         <AppContent />
+        <ToastContainer position="top-right" autoClose={3000} />
       </AuthProvider>
     </Router>
   );
