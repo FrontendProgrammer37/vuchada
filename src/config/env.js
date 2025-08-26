@@ -2,11 +2,10 @@
 
 const ENV = {
   development: {
-    API_URL: 'http://localhost:8000/api/v1',
+    API_URL: 'http://localhost:8000',
   },
   production: {
-    // Substitua pela URL real do seu backend em produção
-    API_URL: 'https://api.seudominio.com/api/v1',
+    API_URL: 'https://backend-production-f01c.up.railway.app',
   },
 };
 

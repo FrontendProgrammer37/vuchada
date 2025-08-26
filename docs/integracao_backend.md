@@ -2,193 +2,246 @@
 
 ## Introdução
 
-Este documento descreve os requisitos e especificações para a integração do backend com o frontend do sistema PDV. O objetivo é garantir que o backend forneça dados consistentes e válidos para o frontend, especialmente para a exibição de valores monetários e informações de vendas.
-
-## Requisitos de API para Vendas
-
-### Endpoint de Listagem de Vendas
-
-**URL**: `/api/sales`
-
-**Método**: `GET`
-
-**Parâmetros de Query**:
-- `page`: Número da página (padrão: 1)
-- `limit`: Itens por página (padrão: 10)
-- `start_date`: Data inicial para filtro (formato: YYYY-MM-DD)
-- `end_date`: Data final para filtro (formato: YYYY-MM-DD)
-- `status`: Status da venda para filtro (concluída, pendente, cancelada)
-- `min_value`: Valor mínimo para filtro
-- `max_value`: Valor máximo para filtro
-
-**Resposta Esperada**:
-```json
-{
-  "data": [
-    {
-      "id": "string",
-      "total_amount": "number",
-      "created_at": "string (ISO date)",
-      "updated_at": "string (ISO date)",
-      "status": "string (concluída, pendente, cancelada)",
-      "items": [
-        {
-          "id": "string",
-          "product_id": "string",
-          "product_name": "string",
-          "quantity": "number",
-          "unit_price": "number",
-          "subtotal": "number"
-        }
-      ]
-    }
-  ],
-  "pagination": {
-    "total": "number",
-    "page": "number",
-    "limit": "number",
-    "total_pages": "number"
-  }
-}
-```
-
-### Validações Importantes
-
-1. **Valores Monetários**:
-   - Todos os valores monetários (`total_amount`, `unit_price`, `subtotal`) devem ser números válidos
-   - Não devem ser nulos, indefinidos ou NaN
-   - Devem ser enviados como números, não como strings
-   - Devem ter precisão de 2 casas decimais
-
-2. **Datas**:
-   - Todas as datas devem estar em formato ISO (YYYY-MM-DDTHH:mm:ss.sssZ)
-   - Não devem ser nulas ou indefinidas
-
-3. **Status**:
-   - O status deve ser um dos valores permitidos: "concluída", "pendente" ou "cancelada"
-   - Não deve ser nulo ou indefinido
-
-4. **IDs**:
-   - Todos os IDs devem ser strings válidas
-   - Não devem ser nulos ou indefinidos
-
-## Requisitos de API para Dashboard
-
-### Endpoint de Estatísticas
-
-**URL**: `/api/statistics`
-
-**Método**: `GET`
-
-**Parâmetros de Query**:
-- `period`: Período para estatísticas (today, week, month, year)
-
-**Resposta Esperada**:
-```json
-{
-  "sales": {
-    "count": "number",
-    "total": "number"
-  },
-  "revenue": {
-    "today": "number",
-    "week": "number",
-    "month": "number"
-  },
-  "profit": {
-    "today": "number",
-    "week": "number",
-    "month": "number"
-  },
-
-  "stock": {
-    "value": "number",
-    "potential_value": "number",
-    "potential_profit": "number",
-    "count": "number"
-  },
-  "recent_sales": [
-    {
-      "id": "string",
-      "total_amount": "number",
-      "created_at": "string (ISO date)",
-      "status": "string"
-    }
-  ]
-}
-```
-
-## Tratamento de Erros
-
-### Formato de Resposta de Erro
-
-```json
-{
-  "error": {
-    "code": "string",
-    "message": "string",
-    "details": "object (opcional)"
-  }
-}
-```
-
-### Códigos de Status HTTP
-
-- `200 OK`: Requisição bem-sucedida
-- `400 Bad Request`: Parâmetros inválidos
-- `401 Unauthorized`: Autenticação necessária
-- `403 Forbidden`: Sem permissão para acessar o recurso
-- `404 Not Found`: Recurso não encontrado
-- `500 Internal Server Error`: Erro interno do servidor
+Este documento descreve os requisitos e especificações para a integração do backend com o frontend do sistema PDV. O objetivo é garantir que o backend forneça dados consistentes e válidos para o frontend, seguindo os padrões estabelecidos.
 
 ## Autenticação
 
-### Endpoint de Login
-
-**URL**: `/api/auth/login`
-
-**Método**: `POST`
-
-**Corpo da Requisição**:
-```json
-{
-  "username": "string",
-  "password": "string"
-}
-```
-
-**Resposta Esperada**:
-```json
-{
-  "token": "string",
-  "user": {
-    "id": "string",
-    "name": "string",
-    "role": "string"
+### POST /api/auth/login
+- **Descrição**: Autentica um usuário e retorna um token JWT
+- **Request**:
+  ```json
+  {
+    "username": "usuario",
+    "password": "senha123"
   }
-}
-```
+  ```
+- **Response (200 OK)**:
+  ```json
+  {
+    "token": "jwt.token.here",
+    "user": {
+      "id": 1,
+      "name": "Nome do Usuário",
+      "username": "usuario",
+      "email": "usuario@exemplo.com",
+      "is_admin": true,
+      "can_supply": false
+    }
+  }
+  ```
 
-### Autenticação de Requisições
+## Produtos
 
-Todas as requisições à API (exceto login) devem incluir o token de autenticação no cabeçalho:
+### GET /api/products
+- **Descrição**: Lista produtos com suporte a filtros e paginação
+- **Query Params**:
+  - `search`: Filtra por nome ou SKU
+  - `category_id`: Filtra por categoria
+  - `page`: Número da página (padrão: 1)
+  - `per_page`: Itens por página (padrão: 20)
+- **Response (200 OK)**:
+  ```json
+  {
+    "data": [
+      {
+        "id": 1,
+        "name": "Produto de Exemplo",
+        "description": "Descrição do produto",
+        "sku": "COD123",
+        "cost_price": 10.50,
+        "sale_price": 19.90,
+        "current_stock": 100,
+        "min_stock": 10,
+        "category_id": 1,
+        "venda_por_peso": false,
+        "created_at": "2023-01-01T00:00:00Z",
+        "updated_at": "2023-01-01T00:00:00Z"
+      }
+    ],
+    "meta": {
+      "current_page": 1,
+      "per_page": 20,
+      "total_items": 100,
+      "total_pages": 5
+    }
+  }
+  ```
 
-```
-Authorization: Bearer {token}
-```
+### POST /api/products
+- **Descrição**: Cria um novo produto
+- **Request**:
+  ```json
+  {
+    "name": "Novo Produto",
+    "description": "Descrição do novo produto",
+    "sku": "COD124",
+    "cost_price": 15.75,
+    "sale_price": 29.90,
+    "current_stock": 50,
+    "min_stock": 5,
+    "category_id": 1,
+    "venda_por_peso": false
+  }
+  ```
+- **Response (201 Created)**: Retorna o produto criado
 
-## Considerações Finais
+## Vendas
 
-1. **Validação de Dados**: O backend deve validar todos os dados antes de enviá-los ao frontend para garantir que estejam no formato correto.
+### GET /api/sales
+- **Descrição**: Lista vendas com filtros
+- **Query Params**:
+  - `start_date`: Data inicial (YYYY-MM-DD)
+  - `end_date`: Data final (YYYY-MM-DD)
+  - `status`: Status da venda
+  - `page`: Número da página
+  - `per_page`: Itens por página
+- **Response (200 OK)**:
+  ```json
+  {
+    "data": [
+      {
+        "id": 1,
+        "total_amount": 100.50,
+        "payment_method": "dinheiro",
+        "status": "concluída",
+        "created_at": "2023-01-01T12:00:00Z",
+        "items": [
+          {
+            "product_id": 1,
+            "product_name": "Produto A",
+            "quantity": 2,
+            "unit_price": 50.25,
+            "subtotal": 100.50
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "current_page": 1,
+      "per_page": 20,
+      "total_items": 1,
+      "total_pages": 1
+    }
+  }
+  ```
 
-2. **Valores Padrão**: Para campos que podem ser nulos ou indefinidos, o backend deve fornecer valores padrão apropriados.
+### POST /api/sales
+- **Descrição**: Cria uma nova venda
+- **Request**:
+  ```json
+  {
+    "payment_method": "dinheiro",
+    "items": [
+      {
+        "product_id": 1,
+        "quantity": 2,
+        "unit_price": 10.50,
+        "discount": 0.00
+      }
+    ]
+  }
+  ```
+- **Response (201 Created)**: Retorna a venda criada
 
-3. **Paginação**: Todos os endpoints que retornam listas devem implementar paginação para melhorar o desempenho.
+## Funcionários
 
-4. **Cache**: Considere implementar cache para endpoints frequentemente acessados, como estatísticas do dashboard.
+### GET /api/employees
+- **Descrição**: Lista funcionários
+- **Query Params**:
+  - `is_admin`: Filtra por administradores
+  - `is_active`: Filtra por status ativo/inativo
+  - `page`: Número da página
+  - `per_page`: Itens por página
 
-5. **Logs**: Implemente logs detalhados para facilitar a depuração de problemas de integração.
+### POST /api/employees
+- **Descrição**: Cria um novo funcionário
+- **Request**:
+  ```json
+  {
+    "name": "Nome Completo",
+    "username": "usuario",
+    "email": "email@exemplo.com",
+    "password": "senha123",
+    "is_admin": false,
+    "can_supply": true
+  }
+  ```
 
-6. **Versionamento da API**: Considere implementar versionamento da API para facilitar futuras atualizações sem quebrar a compatibilidade.
+## Categorias
 
-7. **Documentação da API**: Mantenha esta documentação atualizada e considere usar ferramentas como Swagger para documentação interativa.
+### GET /api/categories
+- **Descrição**: Lista todas as categorias
+- **Response (200 OK)**:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Bebidas",
+      "description": "Bebidas em geral"
+    }
+  ]
+  ```
+
+## Padrões e Convenções
+
+1. **Autenticação**:
+   - Todas as rotas (exceto login) requerem o header `Authorization: Bearer <token>`
+   - Tokens expiram em 24h
+
+2. **Valores Monetários**:
+   - Sempre números com 2 casas decimais
+   - Números positivos
+   - Nenhum valor monetário pode ser nulo
+
+3. **Datas**:
+   - Formato ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ)
+   - Fuso horário UTC
+
+4. **Paginação**:
+   - Todas as listas são paginadas
+   - Parâmetros: `page` e `per_page`
+   - Metadados incluídos na resposta
+
+5. **Tratamento de Erros**:
+   - 400 Bad Request: Dados inválidos
+   - 401 Unauthorized: Token inválido/expirado
+   - 403 Forbidden: Permissão negada
+   - 404 Not Found: Recurso não encontrado
+   - 422 Unprocessable Entity: Erro de validação
+   - 500 Internal Server Error: Erro no servidor
+
+   Exemplo de erro:
+   ```json
+   {
+     "error": {
+       "code": "validation_error",
+       "message": "Dados inválidos",
+       "details": {
+         "name": ["Campo obrigatório"],
+         "email": ["Email inválido"]
+       }
+     }
+   }
+   ```
+
+## Considerações de Segurança
+
+1. **Senhas**:
+   - Armazenar com hash bcrypt
+   - Nunca retornar em respostas
+
+2. **Dados Sensíveis**:
+   - Usar HTTPS em produção
+   - Não expor informações desnecessárias
+
+3. **Rate Limiting**:
+   - Implementar limites de requisições
+   - Especialmente para login
+
+## Próximos Passos
+
+1. Implementar documentação Swagger/OpenAPI
+2. Adicionar mais testes de integração
+3. Implementar cache para melhor desempenho
+4. Adicionar logs detalhados
+5. Configurar monitoramento e alertas
