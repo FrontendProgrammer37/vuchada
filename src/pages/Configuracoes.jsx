@@ -13,7 +13,9 @@ import {
   AlertTriangle,
   Info,
   Download,
-  User as UserIcon
+  User as UserIcon,
+  Menu,
+  X as CloseIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import UserProfile from '../components/UserProfile';
@@ -23,6 +25,7 @@ const Configuracoes = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('perfil');
   const [editMode, setEditMode] = useState({});
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [empresa, setEmpresa] = useState({
     nome: 'Neotrix Comércio Lda',
@@ -78,9 +81,9 @@ const Configuracoes = () => {
     { id: 'empresa', name: 'Empresa', icon: <Building2 size={18} /> },
     { id: 'sistema', name: 'Sistema', icon: <Settings size={18} /> },
     { id: 'backup', name: 'Backup', icon: <Database size={18} /> },
-    { id: 'seguranca', name: 'Segurança', icon: <Shield size={18} /> },
     { id: 'usuarios', name: 'Usuários', icon: <Users size={18} /> },
     { id: 'notificacoes', name: 'Notificações', icon: <Bell size={18} /> },
+    { id: 'seguranca', name: 'Segurança', icon: <Shield size={18} /> },
   ];
 
   const renderTabContent = () => {
@@ -371,37 +374,149 @@ const Configuracoes = () => {
     }
   };
 
+  // Fechar menu ao pressionar ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileMenuOpen]);
+
+  // Desabilitar scroll do body quando o menu estiver aberto
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMobileMenuOpen]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Configurações</h1>
+      {/* Cabeçalho mobile */}
+      <div className="md:hidden bg-white shadow-sm sticky top-0 z-40">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-gray-900">Configurações</h1>
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 -mr-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+            aria-label="Abrir menu"
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-menu"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+        <h1 className="hidden md:block text-2xl font-bold text-gray-900 mb-6">Configurações</h1>
         
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Barra lateral de navegação */}
-          <nav className="md:w-64 flex-shrink-0">
-            <ul className="space-y-1">
-              {tabs.map((tab) => (
-                <li key={tab.id}>
-                  <button
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md ${
-                      activeTab === tab.id
-                        ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
-                    }`}
-                  >
-                    <span className="mr-3">{tab.icon}</span>
-                    {tab.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </nav>
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Menu lateral para desktop */}
+          <aside className="hidden md:block w-64 flex-shrink-0">
+            <nav>
+              <ul className="space-y-1">
+                {tabs.map((tab) => (
+                  <li key={tab.id}>
+                    <button
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                        activeTab === tab.id
+                          ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
+                      }`}
+                    >
+                      <span className="mr-3">{tab.icon}</span>
+                      {tab.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </aside>
+
+          {/* Menu lateral móvel */}
+          <div 
+            id="mobile-menu"
+            className={`fixed inset-0 z-30 md:hidden transition-opacity duration-300 ease-in-out ${
+              isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+            aria-hidden={!isMobileMenuOpen}
+          >
+            {/* Overlay escuro com transição suave */}
+            <div 
+              className={`fixed inset-0 bg-black transition-opacity duration-300 ${
+                isMobileMenuOpen ? 'opacity-50' : 'opacity-0'
+              }`}
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-hidden="true"
+            />
+            
+            {/* Menu deslizante */}
+            <div 
+              className={`fixed inset-y-0 left-0 w-72 bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
+                isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+              }`}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu de navegação"
+            >
+              <div className="flex items-center justify-between p-4 border-b">
+                <h2 className="text-lg font-medium">Menu</h2>
+                <button 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2 -mr-2 rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-label="Fechar menu"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <nav className="p-2 h-[calc(100%-57px)] overflow-y-auto">
+                <ul className="space-y-1">
+                  {tabs.map((tab) => (
+                    <li key={tab.id}>
+                      <button
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
+                          activeTab === tab.id
+                            ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-500'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                        aria-current={activeTab === tab.id ? 'page' : undefined}
+                      >
+                        <span className="mr-3">{tab.icon}</span>
+                        {tab.name}
+                        {activeTab === tab.id && (
+                          <span className="ml-auto text-blue-500">
+                            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </div>
+          </div>
           
           {/* Conteúdo principal */}
-          <div className="flex-1">
+          <main className="flex-1 bg-white rounded-lg shadow-sm p-4 md:p-6">
             {renderTabContent()}
-          </div>
+          </main>
         </div>
       </div>
     </div>
