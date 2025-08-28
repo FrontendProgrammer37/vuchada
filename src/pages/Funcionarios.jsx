@@ -171,6 +171,7 @@ const Funcionarios = () => {
 
       // Fechar o modal e recarregar a lista
       setShowModal(false);
+      setEditingEmployee(null); // Limpar o usuário em edição
       await loadEmployees(pagination.page, pagination.size);
       
     } catch (error) {
@@ -565,6 +566,11 @@ const UserModal = ({ user, onSave, onClose }) => {
     }
     
     const dataToSend = { ...formData };
+    
+    // Incluir o ID do usuário se estiver editando
+    if (user?.id) {
+      dataToSend.id = user.id;
+    }
     
     // Remover senha se não foi alterada
     if (user && !dataToSend.password) {
