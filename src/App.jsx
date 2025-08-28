@@ -11,7 +11,6 @@ import Funcionarios from './pages/Funcionarios';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import TodasVendas from './pages/TodasVendas';
-import PDVPage from './pages/PDVPage';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -30,15 +29,6 @@ const ProtectedRoute = ({ children }) => {
   }
   
   return children;
-};
-
-// Componente para rotas do PDV
-const PDVLayout = ({ children }) => {
-  return (
-    <CartProvider>
-      {children}
-    </CartProvider>
-  );
 };
 
 // Componente principal da aplicação
@@ -66,16 +56,6 @@ const AppContent = () => {
             <Layout>
               <Dashboard />
             </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/pdv"
-        element={
-          <ProtectedRoute>
-            <PDVLayout>
-              <PDVPage />
-            </PDVLayout>
           </ProtectedRoute>
         }
       />
@@ -142,12 +122,12 @@ const AppContent = () => {
 // Componente principal App
 const App = () => {
   return (
-    <Router>
-      <AuthProvider>
+    <AuthProvider>
+      <ToastContainer position="top-right" autoClose={5000} />
+      <Router>
         <AppContent />
-        <ToastContainer position="top-right" autoClose={3000} />
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 };
 

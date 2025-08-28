@@ -26,25 +26,11 @@ const cartService = {
       const response = await apiService.request(CART_ENDPOINT);
       return response;
     } catch (error) {
+      // Se o carrinho não existir, retorna um carrinho vazio
+      if (error.response?.status === 404) {
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      }
       console.error('Erro ao buscar carrinho:', error);
-      throw error;
-    }
-  },
-
-  // Finalizar compra
-  async checkout(paymentMethod, customerId = null, notes = '') {
-    try {
-      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
-        method: 'POST',
-        body: {
-          payment_method: paymentMethod,
-          customer_id: customerId,
-          notes: notes
-        }
-      });
-      return response;
-    } catch (error) {
-      console.error('Erro ao finalizar compra:', error);
       throw error;
     }
   },
@@ -52,11 +38,6 @@ const cartService = {
   // Atualizar quantidade de um item
   async updateItemQuantity(productId, quantity) {
     try {
-      // Se quantidade for 0 ou negativa, remove o item
-      if (quantity <= 0) {
-        return await this.removeItem(productId);
-      }
-      
       const response = await apiService.request(`${CART_ENDPOINT}/update`, {
         method: 'PUT',
         body: {
@@ -66,7 +47,7 @@ const cartService = {
       });
       return response;
     } catch (error) {
-      console.error('Erro ao atualizar item do carrinho:', error);
+      console.error('Erro ao atualizar quantidade:', error);
       throw error;
     }
   },
@@ -80,7 +61,7 @@ const cartService = {
       });
       return response;
     } catch (error) {
-      console.error('Erro ao remover item do carrinho:', error);
+      console.error('Erro ao remover item:', error);
       throw error;
     }
   },
@@ -96,6 +77,17 @@ const cartService = {
       console.error('Erro ao limpar carrinho:', error);
       throw error;
     }
+  },
+
+  // Verificar se um item está no carrinho
+  isInCart(items, productId) {
+    return items.some(item => item.product_id === productId);
+  },
+
+  // Obter quantidade de um item no carrinho
+  getItemQuantity(items, productId) {
+    const item = items.find(item => item.product_id === productId);
+    return item ? item.quantity : 0;
   }
 };
 
