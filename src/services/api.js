@@ -243,7 +243,7 @@ class ApiService {
     async createEmployee(employeeData) {
         return this.request('employees/', {
             method: 'POST',
-            body: employeeData
+            body: JSON.stringify(employeeData)
         });
     }
 
@@ -256,7 +256,7 @@ class ApiService {
     async updateEmployee(id, employeeData) {
         return this.request(`employees/${id}`, {
             method: 'PUT',
-            body: employeeData
+            body: JSON.stringify(employeeData)
         });
     }
 

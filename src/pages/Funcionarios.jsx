@@ -136,21 +136,48 @@ const Funcionarios = () => {
   }, []);
 
   // Função para salvar/atualizar funcionário
-  const handleSaveEmployee = async (employeeData) => {
+  const onSave = async (employeeData) => {
     try {
-      setError(null);
+      setLoading(true);
       
-      if (editingEmployee) {
-        await apiService.updateEmployee(editingEmployee.id, employeeData);
+      // Preparar os dados para envio
+      const employeeToSave = {
+        full_name: employeeData.full_name,
+        username: employeeData.username,
+        salary: parseFloat(employeeData.salary) || 0,
+        is_admin: Boolean(employeeData.is_admin),
+        can_sell: Boolean(employeeData.can_sell),
+        can_manage_inventory: Boolean(employeeData.can_manage_inventory),
+        can_manage_expenses: Boolean(employeeData.can_manage_expenses),
+        is_active: employeeData.is_active !== undefined ? employeeData.is_active : true
+      };
+
+      // Se for uma atualização e não for para alterar a senha, remover a senha
+      if (employeeData.id) {
+        if (employeeData.password) {
+          employeeToSave.password = employeeData.password;
+        }
+        await apiService.updateEmployee(employeeData.id, employeeToSave);
+        toast.success('Funcionário atualizado com sucesso!');
       } else {
-        await apiService.createEmployee(employeeData);
+        // Para criação, a senha é obrigatória
+        if (!employeeData.password) {
+          throw new Error('A senha é obrigatória para novo funcionário');
+        }
+        employeeToSave.password = employeeData.password;
+        await apiService.createEmployee(employeeToSave);
+        toast.success('Funcionário criado com sucesso!');
       }
-      
+
+      // Fechar o modal e recarregar a lista
       setShowModal(false);
-      setEditingEmployee(null);
-      await loadEmployees();
-    } catch (err) {
-      setError(err.message || 'Erro ao salvar funcionário');
+      await loadEmployees(pagination.page, pagination.size);
+      
+    } catch (error) {
+      console.error('Erro ao salvar funcionário:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao salvar funcionário');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -472,7 +499,7 @@ const Funcionarios = () => {
       {showModal && (
         <UserModal
           user={editingEmployee}
-          onSave={handleSaveEmployee}
+          onSave={onSave}
           onClose={() => {
             setShowModal(false);
             setEditingEmployee(null);
