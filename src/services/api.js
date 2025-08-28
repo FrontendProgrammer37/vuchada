@@ -488,6 +488,106 @@ class ApiService {
             method: 'POST',
         });
     }
+
+    // ===== CARRINHO =====
+    
+    // Adicionar item ao carrinho
+    async addToCart(productId, quantity = 1) {
+        return this.request('cart/add', {
+            method: 'POST',
+            body: JSON.stringify({
+                product_id: productId,
+                quantity: quantity
+            })
+        });
+    }
+
+    // Remover item do carrinho
+    async removeFromCart(productId) {
+        return this.request(`cart/remove/${productId}`, {
+            method: 'DELETE'
+        });
+    }
+
+    // Atualizar quantidade no carrinho
+    async updateCartItem(productId, quantity) {
+        return this.request(`cart/update/${productId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ quantity })
+        });
+    }
+
+    // Obter carrinho atual
+    async getCart() {
+        return this.request('cart');
+    }
+
+    // Limpar carrinho
+    async clearCart() {
+        return this.request('cart/clear', {
+            method: 'DELETE'
+        });
+    }
+
+    // ===== VENDAS =====
+    
+    // Criar nova venda
+    async createSale(saleData) {
+        return this.request('sales/', {
+            method: 'POST',
+            body: JSON.stringify(saleData)
+        });
+    }
+
+    // Obter detalhes de uma venda
+    async getSale(saleId) {
+        return this.request(`sales/${saleId}`);
+    }
+
+    // Listar vendas com filtros opcionais
+    async listSales({ 
+        startDate, 
+        endDate, 
+        status, 
+        paymentMethod, 
+        page = 1, 
+        limit = 10 
+    } = {}) {
+        const params = new URLSearchParams();
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        if (status) params.append('status', status);
+        if (paymentMethod) params.append('payment_method', paymentMethod);
+        params.append('page', page);
+        params.append('limit', limit);
+
+        return this.request(`sales/?${params.toString()}`);
+    }
+
+    // Cancelar venda
+    async cancelSale(saleId, reason = '') {
+        return this.request(`sales/${saleId}/cancel`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        });
+    }
+
+    // Obter métodos de pagamento disponíveis
+    async getPaymentMethods() {
+        return [
+            { value: 'DINHEIRO', label: 'Dinheiro' },
+            { value: 'MPESA', label: 'M-Pesa' },
+            { value: 'EMOLA', label: 'Emola' },
+            { value: 'CARTAO_POS', label: 'Cartão P.O.S' },
+            { value: 'TRANSFERENCIA', label: 'Transferência' },
+            { value: 'MILLENNIUM', label: 'Millennium Bank' },
+            { value: 'BCI', label: 'BCI' },
+            { value: 'STANDARD_BANK', label: 'Standard Bank' },
+            { value: 'ABSA_BANK', label: 'ABSA Bank' },
+            { value: 'LETSHEGO', label: 'Letshego' },
+            { value: 'MYBUCKS', label: 'MyBucks' }
+        ];
+    }
 }
 
 // Instância global do serviço de API
