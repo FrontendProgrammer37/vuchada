@@ -217,17 +217,45 @@ const Funcionarios = () => {
     setShowModal(true);
   };
 
+  // Função para alternar o status do usuário (ativo/inativo)
+  const toggleUserStatus = async (user) => {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      await apiService.updateEmployee(user.id, { 
+        is_active: !user.is_active 
+      });
+      
+      // Atualiza a lista de funcionários após a mudança
+      await loadEmployees(pagination.page, pagination.size);
+      
+    } catch (err) {
+      console.error('Erro ao atualizar status do usuário:', err);
+      setError('Erro ao atualizar o status do usuário. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filtrar funcionários
   const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = 
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.username.toLowerCase().includes(searchTerm.toLowerCase());
+    // Verificar se o employee é válido
+    if (!employee) return false;
     
+    const searchTermLower = (searchTerm || '').toLowerCase();
+    const fullName = employee.full_name || '';
+    const username = employee.username || '';
+    
+    const matchesSearch = 
+      fullName.toLowerCase().includes(searchTermLower) ||
+      username.toLowerCase().includes(searchTermLower);
+      
     const matchesFilters = 
       (filters.is_admin === null || employee.is_admin === filters.is_admin) &&
       (filters.can_sell === null || employee.can_sell === filters.can_sell) &&
       (filters.is_active === null || employee.is_active === filters.is_active);
-    
+      
     return matchesSearch && matchesFilters;
   });
 
@@ -259,89 +287,99 @@ const Funcionarios = () => {
     }
 
     return (
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Nome
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Usuário
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Salário
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Admin
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Vender
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredEmployees.map((employee) => (
-              <tr key={employee.id} className={!employee.is_active ? 'bg-gray-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{employee.name}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">{employee.username}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'MZN'
-                    }).format(employee.salary || 0)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge isActive={employee.is_admin} />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge isActive={employee.can_sell} />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge isActive={employee.is_active} />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => {
-                      setEditingEmployee(employee);
-                      setShowModal(true);
-                    }}
-                    className="text-blue-600 hover:text-blue-900 mr-4"
-                  >
-                    Editar
-                  </button>
-                  {employee.is_active ? (
-                    <button
-                      onClick={() => handleDeleteClick(employee)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Desativar
-                    </button>
+      <div className="mt-8 flex flex-col">
+        <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+          <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+              <table className="min-w-full divide-y divide-gray-300">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                      Nome
+                    </th>
+                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      Usuário
+                    </th>
+                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      Status
+                    </th>
+                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      Admin
+                    </th>
+                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                      Vendas
+                    </th>
+                    <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {filteredEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
+                        {loading ? 'Carregando...' : 'Nenhum funcionário encontrado'}
+                      </td>
+                    </tr>
                   ) : (
-                    <button
-                      onClick={() => handleActivateEmployee(employee.id)}
-                      className="text-green-600 hover:text-green-900"
-                    >
-                      Ativar
-                    </button>
+                    filteredEmployees.map((employee) => (
+                      <tr key={employee?.id || Math.random()} className={!employee?.is_active ? 'bg-gray-50' : ''}>
+                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                          {employee?.full_name || 'N/A'}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          {employee?.username || 'N/A'}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <StatusBadge isActive={employee?.is_active} />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <StatusBadge isActive={employee?.is_admin} />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                          <StatusBadge isActive={employee?.can_sell} />
+                        </td>
+                        <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                          <div className="flex space-x-2 justify-end">
+                            <button
+                              onClick={() => handleOpenModal(employee)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Editar"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => toggleUserStatus(employee)}
+                              className={employee?.is_active 
+                                ? "text-yellow-600 hover:text-yellow-900" 
+                                : "text-green-600 hover:text-green-900"}
+                              title={employee?.is_active ? "Desativar" : "Ativar"}
+                            >
+                              {employee?.is_active ? (
+                                <UserX className="h-4 w-4" />
+                              ) : (
+                                <UserCheck className="h-4 w-4" />
+                              )}
+                            </button>
+                            {employee?.id !== currentUser?.id && (
+                              <button
+                                onClick={() => handleDeleteClick(employee)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Excluir"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -428,9 +466,7 @@ const Funcionarios = () => {
       </div>
 
       {/* Tabela */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        {renderTable()}
-      </div>
+      {renderTable()}
 
       {/* Modal */}
       {showModal && (
