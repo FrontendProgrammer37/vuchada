@@ -293,8 +293,8 @@ const Funcionarios = () => {
     return matchesSearch && matchesFilters;
   });
 
-  // Renderizar tabela
-  const renderTable = () => {
+  // Renderizar cards para mobile
+  const renderMobileCards = () => {
     if (loading) {
       return (
         <div className="flex justify-center items-center h-64">
@@ -321,177 +321,241 @@ const Funcionarios = () => {
     }
 
     return (
-      <div className="mt-8 flex flex-col">
-        <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-300">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                      Nome
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Usuário
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Status
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Admin
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Vendas
-                    </th>
-                    <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                      <span className="sr-only">Ações</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {filteredEmployees.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
-                        {loading ? 'Carregando...' : 'Nenhum funcionário encontrado'}
-                      </td>
-                    </tr>
+      <div className="mt-4 space-y-4 sm:hidden">
+        {filteredEmployees.map((employee) => (
+          <div key={employee.id} className="bg-white shadow overflow-hidden rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">{employee.full_name}</h3>
+                <StatusBadge isActive={employee.is_active} />
+              </div>
+              <p className="mt-1 text-sm text-gray-500">@{employee.username}</p>
+              
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Admin</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {employee.is_admin ? 'Sim' : 'Não'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Vendas</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {employee.can_sell ? 'Sim' : 'Não'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="mt-4 flex space-x-2">
+                <button
+                  onClick={() => toggleUserStatus(employee)}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  {employee.is_active ? (
+                    <UserX className="h-4 w-4 mr-1" />
                   ) : (
-                    filteredEmployees.map((employee) => (
-                      <tr key={employee?.id || Math.random()} className={!employee?.is_active ? 'bg-gray-50' : ''}>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                          {employee?.full_name || 'N/A'}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {employee?.username || 'N/A'}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          <StatusBadge isActive={employee?.is_active} />
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          <StatusBadge isActive={employee?.is_admin} />
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          <StatusBadge isActive={employee?.can_sell} />
-                        </td>
-                        <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                          <div className="flex space-x-2 justify-end">
-                            <button
-                              onClick={() => handleOpenModal(employee)}
-                              className="text-blue-600 hover:text-blue-900"
-                              title="Editar"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => toggleUserStatus(employee)}
-                              className={employee?.is_active 
-                                ? "text-yellow-600 hover:text-yellow-900" 
-                                : "text-green-600 hover:text-green-900"}
-                              title={employee?.is_active ? "Desativar" : "Ativar"}
-                            >
-                              {employee?.is_active ? (
-                                <UserX className="h-4 w-4" />
-                              ) : (
-                                <UserCheck className="h-4 w-4" />
-                              )}
-                            </button>
-                            {employee?.id !== currentUser?.id && (
-                              <button
-                                onClick={() => handleDeleteClick(employee)}
-                                className="text-red-600 hover:text-red-900"
-                                title="Excluir"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    <UserCheck className="h-4 w-4 mr-1" />
                   )}
-                </tbody>
-              </table>
+                  {employee.is_active ? 'Desativar' : 'Ativar'}
+                </button>
+                <button
+                  onClick={() => handleOpenModal(employee)}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Editar
+                </button>
+                <button
+                  onClick={() => handleDeleteClick(employee)}
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Excluir
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
     );
   };
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Cabeçalho */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Gerenciar Funcionários</h1>
-        <button
-          onClick={handleOpenModal}
-          className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Funcionário
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white shadow rounded-lg p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
-          <div className="flex-1">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                name="search"
-                value={filters.search}
-                onChange={handleFilterChange}
-                placeholder="Buscar por nome ou usuário..."
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-            </div>
+  // Renderizar tabela para desktop
+  const renderDesktopTable = () => (
+    <div className="hidden sm:block mt-8 flex flex-col">
+      <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+        <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+            <table className="min-w-full divide-y divide-gray-300">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                    Nome
+                  </th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    Usuário
+                  </th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    Status
+                  </th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    Admin
+                  </th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                    Vendas
+                  </th>
+                  <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                    <span className="sr-only">Ações</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {filteredEmployees.map((employee) => (
+                  <tr key={employee.id}>
+                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                      {employee.full_name}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      @{employee.username}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      <StatusBadge isActive={employee.is_active} />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      {employee.is_admin ? 'Sim' : 'Não'}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      {employee.can_sell ? 'Sim' : 'Não'}
+                    </td>
+                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                      <div className="flex space-x-2 justify-end">
+                        <button
+                          onClick={() => toggleUserStatus(employee)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title={employee.is_active ? 'Desativar' : 'Ativar'}
+                        >
+                          {employee.is_active ? (
+                            <UserX className="h-5 w-5" />
+                          ) : (
+                            <UserCheck className="h-5 w-5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleOpenModal(employee)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="Editar"
+                        >
+                          <Edit className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(employee)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          
+        </div>
+      </div>
+    </div>
+  );
+
+  // Atualizar o retorno principal para incluir ambas as visualizações
+  return (
+    <div className="px-4 sm:px-6 lg:px-8 py-8">
+      <div className="sm:flex sm:items-center">
+        <div className="sm:flex-auto">
+          <h1 className="text-2xl font-semibold text-gray-900">Funcionários</h1>
+          <p className="mt-2 text-sm text-gray-700">
+            Gerencie os funcionários do sistema
+          </p>
+        </div>
+        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           <button
             type="button"
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            onClick={() => handleOpenModal()}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
-            <SlidersHorizontal className="h-4 w-4 mr-2" />
-            Filtros
+            <Plus className="-ml-1 mr-2 h-5 w-5" />
+            Novo Funcionário
           </button>
         </div>
+      </div>
 
-        {/* Filtros avançados */}
+      {/* Filtros e busca */}
+      <div className="mt-6">
+        <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+          <div className="relative flex-1 max-w-lg">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              className="block w-full rounded-md border-gray-300 bg-white py-2 pl-10 pr-3 text-sm placeholder-gray-500 focus:border-blue-500 focus:text-gray-900 focus:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+              placeholder="Buscar funcionários..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros
+            </button>
+          </div>
+        </div>
+
+        {/* Filtros expandíveis */}
         {isFilterOpen && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="mt-4 p-4 bg-gray-50 rounded-md">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
                 <select
                   name="is_active"
                   value={filters.is_active}
                   onChange={handleFilterChange}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                 >
-                  <option value="all">Todos</option>
+                  <option value="">Todos</option>
                   <option value="true">Ativos</option>
                   <option value="false">Inativos</option>
                 </select>
               </div>
-              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Acesso</label>
+                <label className="block text-sm font-medium text-gray-700">Tipo</label>
                 <select
-                  name="role"
-                  value={filters.role}
+                  name="is_admin"
+                  value={filters.is_admin}
                   onChange={handleFilterChange}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                 >
-                  <option value="all">Todos</option>
-                  <option value="admin">Administradores</option>
-                  <option value="seller">Vendedores</option>
-                  <option value="inventory">Estoque</option>
-                  <option value="finance">Financeiro</option>
+                  <option value="">Todos</option>
+                  <option value="true">Administradores</option>
+                  <option value="false">Funcionários</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Vendas</label>
+                <select
+                  name="can_sell"
+                  value={filters.can_sell}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                >
+                  <option value="">Todos</option>
+                  <option value="true">Pode vender</option>
+                  <option value="false">Não pode vender</option>
                 </select>
               </div>
             </div>
@@ -499,29 +563,95 @@ const Funcionarios = () => {
         )}
       </div>
 
-      {/* Tabela */}
-      {renderTable()}
+      {/* Visualização mobile */}
+      {renderMobileCards()}
+      
+      {/* Visualização desktop */}
+      {renderDesktopTable()}
 
-      {/* Modal */}
-      {showModal && (
-        <UserModal
-          user={editingEmployee}
-          onSave={onSave}
-          onClose={() => {
-            setShowModal(false);
-            setEditingEmployee(null);
-          }}
-        />
+      {/* Paginação */}
+      {pagination.pages > 1 && (
+        <div className="mt-4 flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+          <div className="flex flex-1 justify-between sm:hidden">
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page === pagination.pages}
+              className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Próximo
+            </button>
+          </div>
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Mostrando <span className="font-medium">{(pagination.page - 1) * pagination.size + 1}</span> a{' '}
+                <span className="font-medium">
+                  {Math.min(pagination.page * pagination.size, pagination.total)}
+                </span>{' '}
+                de <span className="font-medium">{pagination.total}</span> resultados
+              </p>
+            </div>
+            <div>
+              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                <button
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">Anterior</span>
+                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.pages}
+                  className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="sr-only">Próximo</span>
+                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de confirmação */}
-      {isConfirmOpen && (
-        <ConfirmModal
-          isOpen={isConfirmOpen}
-          onConfirm={handleConfirmDelete}
-          onCancel={() => setIsConfirmOpen(false)}
-          title="Confirmar exclusão"
-          message="Tem certeza que deseja excluir este funcionário?"
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setIsConfirmOpen(false);
+          setUserToDelete(null);
+        }}
+        title="Confirmar exclusão"
+        message={`Tem certeza que deseja excluir o funcionário ${userToDelete?.full_name || ''}? Esta ação não pode ser desfeita.`}
+      />
+
+      {/* Modal de edição/criação */}
+      {showModal && (
+        <UserModal
+          user={editingEmployee}
+          onSave={async (userData) => {
+            try {
+              if (editingEmployee) {
+                await apiService.updateEmployee(editingEmployee.id, userData);
+              } else {
+                await apiService.createEmployee(userData);
+              }
+              await loadEmployees(pagination.page, pagination.size);
+              setShowModal(false);
+            } catch (err) {
+              console.error('Erro ao salvar funcionário:', err);
+            }
+          }}
+          onClose={() => setShowModal(false)}
         />
       )}
     </div>
