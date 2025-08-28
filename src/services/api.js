@@ -208,21 +208,26 @@ class ApiService {
     async updateProduct(id, productData) {
         // Converter do formato do frontend para o formato do backend
         const formattedData = {
-            nome: productData.nome || '',
-            descricao: productData.descricao || null,
-            codigo: productData.codigo || null,
-            preco_compra: parseFloat(productData.preco_compra) || 0,
-            preco_venda: parseFloat(productData.preco_venda) || 0,
-            estoque: parseInt(productData.estoque) || 0,
-            estoque_minimo: parseInt(productData.estoque_minimo) || 0,
-            categoria_id: productData.categoria_id ? parseInt(productData.categoria_id) : null,
+            codigo: productData.sku || null,
+            category_id: productData.category_id ? parseInt(productData.category_id) : null,
+            nome: productData.name || '',
+            descricao: productData.description || null,
+            preco_compra: parseFloat(productData.cost_price) || 0,
+            preco_venda: parseFloat(productData.sale_price) || 0,
+            estoque: parseInt(productData.current_stock) || 0,
+            estoque_minimo: parseInt(productData.min_stock) || 0,
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
+
+        console.log('Dados formatados para atualização:', JSON.stringify(formattedData, null, 2));
 
         return this.request(`products/${id}`, {
             method: 'PUT',
             headers: this.getHeaders(),
             body: JSON.stringify(formattedData),
+        }).catch(error => {
+            console.error('Erro ao atualizar produto:', error);
+            throw error;
         });
     }
 
