@@ -53,8 +53,12 @@ const Produtos = () => {
 
     // Filtrar produtos
     const filteredProducts = products.filter(product => {
-        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+        const productName = product.name ? product.name.toLowerCase() : '';
+        const productSku = product.sku ? product.sku.toLowerCase() : '';
+        const searchTermLower = searchTerm ? searchTerm.toLowerCase() : '';
+        
+        const matchesSearch = productName.includes(searchTermLower) ||
+                            productSku.includes(searchTermLower);
         const matchesCategory = !selectedCategory || product.category_id === parseInt(selectedCategory);
         return matchesSearch && matchesCategory;
     });
