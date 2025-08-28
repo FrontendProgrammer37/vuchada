@@ -185,15 +185,16 @@ class ApiService {
     async createProduct(productData) {
         // Converter do formato do frontend para o formato do backend
         const formattedData = {
-            nome: productData.name,
+            nome: productData.name || '',
             descricao: productData.description || null,
             codigo: productData.sku || null,
-            preco_compra: productData.cost_price?.toString() || '0',
-            preco_venda: productData.sale_price?.toString() || '0',
+            preco_compra: (productData.cost_price || 0).toString(),
+            preco_venda: (productData.sale_price || 0).toString(),
             estoque: parseInt(productData.current_stock) || 0,
             estoque_minimo: parseInt(productData.min_stock) || 0,
             category_id: productData.category_id || null,
-            venda_por_peso: Boolean(productData.venda_por_peso)
+            venda_por_peso: Boolean(productData.venda_por_peso),
+            is_active: true  // Adicionando o campo is_active como true por padrão
         };
 
         return this.request('products/', {
@@ -205,15 +206,16 @@ class ApiService {
     async updateProduct(id, productData) {
         // Converter do formato do frontend para o formato do backend
         const formattedData = {
-            nome: productData.name,
+            nome: productData.name || '',
             descricao: productData.description || null,
             codigo: productData.sku || null,
-            preco_compra: productData.cost_price?.toString() || '0',
-            preco_venda: productData.sale_price?.toString() || '0',
+            preco_compra: (productData.cost_price || 0).toString(),
+            preco_venda: (productData.sale_price || 0).toString(),
             estoque: parseInt(productData.current_stock) || 0,
             estoque_minimo: parseInt(productData.min_stock) || 0,
             category_id: productData.category_id || null,
-            venda_por_peso: Boolean(productData.venda_por_peso)
+            venda_por_peso: Boolean(productData.venda_por_peso),
+            is_active: productData.is_active !== false
         };
 
         return this.request(`products/${id}`, {
