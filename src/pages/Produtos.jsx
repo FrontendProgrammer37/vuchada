@@ -41,14 +41,10 @@ const Produtos = () => {
                 apiService.getCategories()
             ]);
             
-            console.log('Dados recebidos da API:', productsData); // Para debug
-            
-            // Os produtos já estão mapeados no apiService.getProducts()
             setProducts(productsData);
             setCategories(categoriesData);
             setError(null);
         } catch (err) {
-            console.error('Erro ao carregar produtos:', err);
             setError('Erro ao carregar dados: ' + (err.message || 'Erro desconhecido'));
         } finally {
             setLoading(false);
