@@ -3,23 +3,63 @@ import {
   Plus, 
   Search, 
   Edit, 
+  Trash2, 
   UserX, 
   UserCheck, 
-  X 
+  X, 
+  Eye, 
+  EyeOff,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  SlidersHorizontal
 } from 'lucide-react';
 import apiService from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
-// Componente auxiliar para exibir status
-const StatusBadge = ({ value }) => (
-  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-    value ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+// Componente para exibir o status do funcionário
+const StatusBadge = ({ isActive }) => (
+  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+    isActive 
+      ? 'bg-green-100 text-green-800' 
+      : 'bg-red-100 text-red-800'
   }`}>
-    {value ? 'Sim' : 'Não'}
+    {isActive ? 'Ativo' : 'Inativo'}
   </span>
 );
 
+// Componente para o modal de confirmação
+const ConfirmModal = ({ isOpen, onConfirm, onCancel, title, message }) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">{title}</h3>
+        <p className="text-sm text-gray-600 mb-6">{message}</p>
+        <div className="flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Funcionarios = () => {
-  // Estados
+  const { user: currentUser } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,6 +81,10 @@ const Funcionarios = () => {
     can_sell: null,
     is_active: true
   });
+
+  // Estados do modal de confirmação
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   // Carregar funcionários com paginação
   const loadEmployees = async (page = 1, size = 10) => {
@@ -115,6 +159,30 @@ const Funcionarios = () => {
       await loadEmployees();
     } catch (err) {
       setError('Erro ao ativar funcionário');
+    }
+  };
+
+  // Função para confirmar a exclusão de um funcionário
+  const handleDeleteClick = (user) => {
+    setUserToDelete(user);
+    setIsConfirmOpen(true);
+  };
+
+  // Função para confirmar a exclusão
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      setLoading(true);
+      await apiService.deleteEmployee(userToDelete.id);
+      await loadEmployees();
+    } catch (err) {
+      console.error('Erro ao excluir funcionário:', err);
+      setError('Erro ao excluir funcionário. Tente novamente mais tarde.');
+    } finally {
+      setIsConfirmOpen(false);
+      setUserToDelete(null);
+      setLoading(false);
     }
   };
 
@@ -205,13 +273,13 @@ const Funcionarios = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge value={employee.is_admin} />
+                  <StatusBadge isActive={employee.is_admin} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge value={employee.can_sell} />
+                  <StatusBadge isActive={employee.can_sell} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <StatusBadge value={employee.is_active} />
+                  <StatusBadge isActive={employee.is_active} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
@@ -225,7 +293,7 @@ const Funcionarios = () => {
                   </button>
                   {employee.is_active ? (
                     <button
-                      onClick={() => handleDeleteEmployee(employee.id)}
+                      onClick={() => handleDeleteClick(employee)}
                       className="text-red-600 hover:text-red-900"
                     >
                       Desativar
@@ -249,96 +317,83 @@ const Funcionarios = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+      {/* Cabeçalho */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Gerenciar Funcionários</h1>
         <button
-          onClick={() => {
-            setEditingEmployee(null);
-            setShowModal(true);
-          }}
-          className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-900 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          onClick={() => handleOpenModal()}
+          className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
-          <Plus className="h-5 w-5 mr-2" />
+          <Plus className="h-4 w-4 mr-2" />
           Novo Funcionário
         </button>
       </div>
 
       {/* Filtros */}
       <div className="bg-white shadow rounded-lg p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
-              Buscar
-            </label>
-            <div className="relative rounded-md shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
+          <div className="flex-1">
+            <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
+                <Search className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 type="text"
-                id="search"
-                placeholder="Nome ou usuário"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
+                name="search"
+                value={filters.search}
+                onChange={handleFilterChange}
+                placeholder="Buscar por nome ou usuário..."
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
             </div>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tipo
-            </label>
-            <select
-              value={filters.is_admin ?? ''}
-              onChange={(e) => setFilters({
-                ...filters,
-                is_admin: e.target.value === '' ? null : e.target.value === 'true'
-              })}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-            >
-              <option value="">Todos</option>
-              <option value="true">Administradores</option>
-              <option value="false">Funcionários</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Permissão
-            </label>
-            <select
-              value={filters.can_sell ?? ''}
-              onChange={(e) => setFilters({
-                ...filters,
-                can_sell: e.target.value === '' ? null : e.target.value === 'true'
-              })}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-            >
-              <option value="">Todas</option>
-              <option value="true">Pode vender</option>
-              <option value="false">Não pode vender</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              value={filters.is_active ?? ''}
-              onChange={(e) => setFilters({
-                ...filters,
-                is_active: e.target.value === '' ? null : e.target.value === 'true'
-              })}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-            >
-              <option value="true">Ativos</option>
-              <option value="false">Inativos</option>
-              <option value="">Todos</option>
-            </select>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <SlidersHorizontal className="h-4 w-4 mr-2" />
+            Filtros
+          </button>
         </div>
+
+        {/* Filtros avançados */}
+        {isFilterOpen && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  name="is_active"
+                  value={filters.is_active}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                >
+                  <option value="all">Todos</option>
+                  <option value="true">Ativos</option>
+                  <option value="false">Inativos</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Acesso</label>
+                <select
+                  name="role"
+                  value={filters.role}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                >
+                  <option value="all">Todos</option>
+                  <option value="admin">Administradores</option>
+                  <option value="seller">Vendedores</option>
+                  <option value="inventory">Estoque</option>
+                  <option value="finance">Financeiro</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabela */}
@@ -355,6 +410,17 @@ const Funcionarios = () => {
             setShowModal(false);
             setEditingEmployee(null);
           }}
+        />
+      )}
+
+      {/* Modal de confirmação */}
+      {isConfirmOpen && (
+        <ConfirmModal
+          isOpen={isConfirmOpen}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setIsConfirmOpen(false)}
+          title="Confirmar exclusão"
+          message="Tem certeza que deseja excluir este funcionário?"
         />
       )}
     </div>
@@ -430,7 +496,7 @@ const UserModal = ({ user, onSave, onClose }) => {
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
-            ✕
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -443,11 +509,11 @@ const UserModal = ({ user, onSave, onClose }) => {
               type="text"
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border ${errors.full_name ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
               required
             />
             {errors.full_name && (
-              <div className="text-red-500 text-sm mt-1">{errors.full_name}</div>
+              <p className="mt-1 text-sm text-red-600">{errors.full_name}</p>
             )}
           </div>
 
@@ -459,11 +525,11 @@ const UserModal = ({ user, onSave, onClose }) => {
               type="text"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border ${errors.username ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
               required
             />
             {errors.username && (
-              <div className="text-red-500 text-sm mt-1">{errors.username}</div>
+              <p className="mt-1 text-sm text-red-600">{errors.username}</p>
             )}
           </div>
 
@@ -476,21 +542,21 @@ const UserModal = ({ user, onSave, onClose }) => {
                 type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 required={!user}
                 placeholder={user ? 'Deixe em branco para não alterar' : ''}
               />
-              {errors.password && (
-                <div className="text-red-500 text-sm mt-1">{errors.password}</div>
-              )}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-600 hover:text-gray-800"
               >
-                {showPassword ? '👁️' : '👁️‍🗨️'}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {errors.password && (
+              <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+            )}
           </div>
 
           <div>
@@ -512,53 +578,59 @@ const UserModal = ({ user, onSave, onClose }) => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.is_admin}
-                onChange={(e) => setFormData({ ...formData, is_admin: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <span className="ml-2 text-sm text-gray-700">Administrador</span>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Permissões
             </label>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.can_sell}
-                onChange={(e) => setFormData({ ...formData, can_sell: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <span className="ml-2 text-sm text-gray-700">Pode vender</span>
-            </label>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.can_manage_inventory}
-                onChange={(e) => setFormData({ ...formData, can_manage_inventory: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <span className="ml-2 text-sm text-gray-700">Gerenciar estoque</span>
-            </label>
-
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.can_manage_expenses}
-                onChange={(e) => setFormData({ ...formData, can_manage_expenses: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <span className="ml-2 text-sm text-gray-700">Gerenciar despesas</span>
-            </label>
+            
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.is_admin}
+                  onChange={(e) => setFormData({ ...formData, is_admin: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Administrador</span>
+              </label>
+              
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.can_sell}
+                  onChange={(e) => setFormData({ ...formData, can_sell: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Pode realizar vendas</span>
+              </label>
+              
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.can_manage_inventory}
+                  onChange={(e) => setFormData({ ...formData, can_manage_inventory: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Gerenciar estoque</span>
+              </label>
+              
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.can_manage_expenses}
+                  onChange={(e) => setFormData({ ...formData, can_manage_expenses: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Gerenciar despesas</span>
+              </label>
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Cancelar
             </button>
@@ -566,7 +638,7 @@ const UserModal = ({ user, onSave, onClose }) => {
               type="submit"
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              {user ? 'Atualizar' : 'Salvar'}
+              {user ? 'Atualizar' : 'Criar'}
             </button>
           </div>
         </form>
