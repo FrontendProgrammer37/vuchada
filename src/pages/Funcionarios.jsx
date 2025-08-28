@@ -186,6 +186,17 @@ const Funcionarios = () => {
     }
   };
 
+  // Função para lidar com a mudança de filtros
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Resetar para a primeira página ao mudar os filtros
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
   // Filtrar funcionários
   const filteredEmployees = employees.filter(employee => {
     const matchesSearch = 
