@@ -8,10 +8,10 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/add`, {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           product_id: productId,
           quantity: quantity
-        })
+        }
       });
       return response;
     } catch (error) {
@@ -36,11 +36,11 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           payment_method: paymentMethod,
           customer_id: customerId,
           notes: notes
-        })
+        }
       });
       return response;
     } catch (error) {
@@ -59,10 +59,10 @@ const cartService = {
       
       const response = await apiService.request(`${CART_ENDPOINT}/update`, {
         method: 'PUT',
-        body: JSON.stringify({
+        body: {
           product_id: productId,
           quantity: quantity
-        })
+        }
       });
       return response;
     } catch (error) {
@@ -76,9 +76,7 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
         method: 'DELETE',
-        body: JSON.stringify({
-          product_id: productId
-        })
+        body: { product_id: productId }
       });
       return response;
     } catch (error) {

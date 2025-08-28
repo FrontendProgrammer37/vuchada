@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
-import { ShoppingCart, CreditCard, DollarSign, X, Trash2, Plus, Minus, Check, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { ShoppingCart, CreditCard, DollarSign, X, Trash2, Plus, Minus, Check, Loader2, User } from 'lucide-react';
 import ProductSearch from '../components/ProductSearch';
 import { useCart } from '../contexts/CartContext';
-import checkoutService from '../services/checkoutService';
 import { toast } from 'react-toastify';
 
 const PDVPage = () => {
@@ -13,6 +12,7 @@ const PDVPage = () => {
     updateItemQuantity,
     removeFromCart,
     clearCart,
+    checkout,
     isInCart,
     getItemQuantity
   } = useCart();
@@ -51,12 +51,7 @@ const PDVPage = () => {
     try {
       setIsCheckingOut(true);
       
-      const result = await checkoutService.processCheckout({
-        payment_method: paymentMethod,
-        amount_received: paymentMethod === 'dinheiro' ? parseFloat(amountReceived) : cart.total,
-        notes: saleNote,
-        customer_id: customerId || null,
-      });
+      const result = await checkout(paymentMethod, customerId || null, saleNote);
       
       setSaleDetails({
         id: result.id,
@@ -64,10 +59,9 @@ const PDVPage = () => {
         total_amount: result.total_amount,
         payment_method: result.payment_method,
         created_at: result.created_at,
-        change: result.change_amount
+        change: paymentMethod === 'dinheiro' ? calculateChange() : 0
       });
       
-      await clearCart();
       setSaleComplete(true);
       toast.success(`Venda #${result.sale_number} concluída!`);
       
@@ -148,6 +142,12 @@ const PDVPage = () => {
                   </button>
                 </div>
               </div>
+              <div className="mt-1 text-right text-sm font-medium">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                }).format(item.total_price)}
+              </div>
             </li>
           ))}
         </ul>
@@ -155,11 +155,13 @@ const PDVPage = () => {
     );
   };
 
-  // Renderizar resumo da venda
-  const renderOrderSummary = () => (
-    <div className="mt-4 border-t border-gray-200 pt-4">
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm">
+  // Renderizar resumo do pedido
+  const renderOrderSummary = () => {
+    if (cart.items.length === 0) return null;
+
+    return (
+      <div className="border-t border-gray-200 mt-4 pt-4">
+        <div className="flex justify-between py-1">
           <span>Subtotal:</span>
           <span className="font-medium">
             {new Intl.NumberFormat('pt-BR', {
@@ -168,7 +170,7 @@ const PDVPage = () => {
             }).format(cart.subtotal)}
           </span>
         </div>
-        <div className="flex justify-between text-sm">
+        <div className="flex justify-between py-1 text-sm text-gray-600">
           <span>Taxas:</span>
           <span>
             {new Intl.NumberFormat('pt-BR', {
@@ -177,7 +179,7 @@ const PDVPage = () => {
             }).format(cart.tax_amount || 0)}
           </span>
         </div>
-        <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2 mt-2">
+        <div className="flex justify-between py-2 font-bold border-t border-gray-200 mt-2 pt-2">
           <span>Total:</span>
           <span>
             {new Intl.NumberFormat('pt-BR', {
@@ -187,160 +189,233 @@ const PDVPage = () => {
           </span>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Renderizar formulário de pagamento
-  const renderPaymentForm = () => (
-    <div className="mt-6 space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Forma de Pagamento
-        </label>
-        <select
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-          disabled={isCheckingOut || cartLoading}
-        >
-          <option value="dinheiro">Dinheiro</option>
-          <option value="cartao_credito">Cartão de Crédito</option>
-          <option value="cartao_debito">Cartão de Débito</option>
-          <option value="pix">PIX</option>
-        </select>
-      </div>
+  const renderPaymentForm = () => {
+    if (cart.items.length === 0) return null;
 
-      {paymentMethod === 'dinheiro' && (
-        <div>
+    return (
+      <div className="mt-6">
+        <h3 className="text-lg font-medium mb-3">Forma de Pagamento</h3>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {['dinheiro', 'credito', 'debito', 'pix'].map((method) => (
+            <button
+              key={method}
+              type="button"
+              onClick={() => setPaymentMethod(method)}
+              className={`flex items-center justify-center p-3 border rounded-md ${
+                paymentMethod === method
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+            >
+              {method === 'dinheiro' && <DollarSign className="h-5 w-5 mr-2" />}
+              {method === 'credito' && <CreditCard className="h-5 w-5 mr-2" />}
+              {method === 'debito' && <CreditCard className="h-5 w-5 mr-2" />}
+              {method === 'pix' && <span className="mr-2">PIX</span>}
+              {method.charAt(0).toUpperCase() + method.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {paymentMethod === 'dinheiro' && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Valor Recebido
+            </label>
+            <div className="relative rounded-md shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 sm:text-sm">R$</span>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min={cart.total}
+                value={amountReceived}
+                onChange={(e) => setAmountReceived(e.target.value)}
+                className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-12 pr-12 sm:text-sm border-gray-300 rounded-md p-2 border"
+                placeholder="0,00"
+              />
+            </div>
+            {amountReceived && parseFloat(amountReceived) < cart.total && (
+              <p className="mt-1 text-sm text-red-600">
+                Valor insuficiente. Faltam {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                }).format(cart.total - parseFloat(amountReceived))}
+              </p>
+            )}
+            {amountReceived && parseFloat(amountReceived) >= cart.total && (
+              <p className="mt-1 text-sm text-green-600">
+                Troco: {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                }).format(calculateChange())}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Valor Recebido
+            Cliente (opcional)
           </label>
-          <div className="mt-1 relative rounded-md shadow-sm">
+          <div className="relative rounded-md shadow-sm">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500 sm:text-sm">R$</span>
+              <User className="h-5 w-5 text-gray-400" />
             </div>
             <input
-              type="number"
-              value={amountReceived}
-              onChange={(e) => setAmountReceived(e.target.value)}
-              className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-12 pr-12 sm:text-sm border-gray-300 rounded-md"
-              placeholder="0,00"
-              step="0.01"
-              min={cart.total}
-              disabled={isCheckingOut || cartLoading}
+              type="text"
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md p-2 border"
+              placeholder="ID do cliente"
             />
           </div>
-          {amountReceived && parseFloat(amountReceived) > 0 && (
-            <p className="mt-1 text-sm text-gray-500">
-              Troco: {calculateChange()}
-            </p>
-          )}
         </div>
-      )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Observações
-        </label>
-        <textarea
-          rows={2}
-          value={saleNote}
-          onChange={(e) => setSaleNote(e.target.value)}
-          className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 rounded-md"
-          placeholder="Opcional"
-          disabled={isCheckingOut || cartLoading}
-        />
-      </div>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Observações
+          </label>
+          <textarea
+            rows={2}
+            value={saleNote}
+            onChange={(e) => setSaleNote(e.target.value)}
+            className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border"
+            placeholder="Notas sobre a venda..."
+          />
+        </div>
 
-      <button
-        onClick={handleCheckout}
-        disabled={isCheckingOut || cartLoading || cart.items.length === 0}
-        className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-          isCheckingOut || cartLoading || cart.items.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-        }`}
-      >
-        {isCheckingOut ? 'Finalizando...' : 'Finalizar Venda'}
-      </button>
-    </div>
-  );
-
-  // Renderizar confirmação de venda
-  const renderSaleComplete = () => (
-    <div className="text-center py-8">
-      <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
-        <Check className="h-6 w-6 text-green-600" />
-      </div>
-      <h3 className="mt-3 text-lg font-medium text-gray-900">Venda Concluída!</h3>
-      <p className="mt-2 text-sm text-gray-500">
-        Número da venda: {saleDetails?.sale_number}
-      </p>
-      <p className="mt-1 text-lg font-bold">
-        {new Intl.NumberFormat('pt-BR', {
-          style: 'currency',
-          currency: 'BRL'
-        }).format(saleDetails?.total_amount || 0)}
-      </p>
-      <div className="mt-6">
         <button
-          onClick={startNewSale}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          type="button"
+          onClick={handleCheckout}
+          disabled={isCheckingOut || cartLoading || cart.items.length === 0 || 
+                   (paymentMethod === 'dinheiro' && (!amountReceived || parseFloat(amountReceived) < cart.total))}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Plus className="-ml-1 mr-2 h-5 w-5" />
-          Nova Venda
+          {isCheckingOut ? (
+            <>
+              <Loader2 className="animate-spin h-5 w-5 mr-2" />
+              Processando...
+            </>
+          ) : (
+            `Finalizar Venda (${new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL'
+            }).format(cart.total)})`
+          )}
         </button>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Renderizar recibo
+  const renderReceipt = () => {
+    if (!saleComplete || !saleDetails) return null;
+
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto mt-6">
+        <div className="text-center mb-6">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+            <Check className="h-6 w-6 text-green-600" />
+          </div>
+          <h2 className="mt-3 text-lg font-medium text-gray-900">Venda Concluída!</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Nº da venda: {saleDetails.sale_number}
+          </p>
+        </div>
+
+        <div className="border-t border-b border-gray-200 py-4 my-4">
+          <div className="flex justify-between py-1">
+            <span className="text-gray-600">Data/Hora:</span>
+            <span className="font-medium">
+              {new Date(saleDetails.created_at).toLocaleString('pt-BR')}
+            </span>
+          </div>
+          <div className="flex justify-between py-1">
+            <span className="text-gray-600">Forma de pagamento:</span>
+            <span className="font-medium capitalize">
+              {saleDetails.payment_method}
+            </span>
+          </div>
+          {saleDetails.payment_method === 'dinheiro' && saleDetails.change > 0 && (
+            <div className="flex justify-between py-1">
+              <span className="text-gray-600">Troco:</span>
+              <span className="font-medium text-green-600">
+                {new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                }).format(saleDetails.change)}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-between text-lg font-bold mt-4 pt-2 border-t border-gray-200">
+          <span>Total:</span>
+          <span>
+            {new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL'
+            }).format(saleDetails.total_amount)}
+          </span>
+        </div>
+
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={startNewSale}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Nova Venda
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Ponto de Venda</h1>
-        
+    <div className="container mx-auto px-4 py-6">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Ponto de Venda (PDV)</h1>
+      
+      {saleComplete ? (
+        renderReceipt()
+      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Painel de busca de produtos */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white shadow rounded-lg p-6">
+          {/* Painel de Busca de Produtos */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow p-4">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Buscar Produtos</h2>
-              <ProductSearch onAddToCart={handleAddToCart} />
+              <ProductSearch 
+                onSelectProduct={handleAddToCart} 
+                isInCart={isInCart}
+                getItemQuantity={getItemQuantity}
+              />
             </div>
           </div>
 
-          {/* Painel do carrinho */}
-          <div className="lg:col-span-1">
-            <div className="bg-white shadow rounded-lg p-6 h-full flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium text-gray-900">Carrinho</h2>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {cart.itemCount} {cart.itemCount === 1 ? 'item' : 'itens'}
-                </span>
+          {/* Painel do Carrinho */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium text-gray-900">
+                  Carrinho de Compras
+                  {cart.itemCount > 0 && ` (${cart.itemCount} itens)`}
+                </h2>
               </div>
-
-              {saleComplete ? (
-                renderSaleComplete()
-              ) : (
-                <>
-                  {cartLoading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
-                  ) : (
-                    <>
-                      {renderCartItems()}
-                      {cart.items.length > 0 && (
-                        <>
-                          {renderOrderSummary()}
-                          {renderPaymentForm()}
-                        </>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
+              
+              <div className="p-4">
+                {renderCartItems()}
+                {renderOrderSummary()}
+                {renderPaymentForm()}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

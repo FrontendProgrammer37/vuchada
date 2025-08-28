@@ -206,31 +206,68 @@ class ApiService {
 
     // ===== FUNCIONÁRIOS =====
     
-    async getEmployees() {
-        return this.request('employees/');
+    /**
+     * Lista todos os funcionários com suporte a paginação
+     * @param {Object} params - Parâmetros de paginação
+     * @param {number} [params.page=1] - Número da página
+     * @param {number} [params.size=10] - Itens por página
+     * @returns {Promise<Object>} Lista de funcionários e metadados de paginação
+     */
+    async getEmployees({ page = 1, size = 10 } = {}) {
+        const query = new URLSearchParams({ page, size });
+        return this.request(`employees/?${query}`);
     }
 
+    /**
+     * Obtém os detalhes de um funcionário
+     * @param {number|string} id - ID do funcionário
+     * @returns {Promise<Object>} Dados do funcionário
+     */
     async getEmployee(id) {
         return this.request(`employees/${id}`);
     }
 
+    /**
+     * Cria um novo funcionário
+     * @param {Object} employeeData - Dados do funcionário
+     * @param {string} employeeData.full_name - Nome completo
+     * @param {string} employeeData.username - Nome de usuário
+     * @param {string} employeeData.password - Senha
+     * @param {number} employeeData.salary - Salário
+     * @param {boolean} employeeData.is_admin - Se é administrador
+     * @param {boolean} employeeData.can_sell - Pode realizar vendas
+     * @param {boolean} employeeData.can_manage_inventory - Pode gerenciar estoque
+     * @param {boolean} employeeData.can_manage_expenses - Pode gerenciar despesas
+     * @returns {Promise<Object>} Dados do funcionário criado
+     */
     async createEmployee(employeeData) {
         return this.request('employees/', {
             method: 'POST',
-            body: JSON.stringify(employeeData),
+            body: employeeData
         });
     }
 
+    /**
+     * Atualiza um funcionário existente
+     * @param {number|string} id - ID do funcionário
+     * @param {Object} employeeData - Dados atualizados do funcionário
+     * @returns {Promise<Object>} Dados do funcionário atualizado
+     */
     async updateEmployee(id, employeeData) {
         return this.request(`employees/${id}`, {
             method: 'PUT',
-            body: JSON.stringify(employeeData),
+            body: employeeData
         });
     }
 
+    /**
+     * Remove um funcionário (soft delete)
+     * @param {number|string} id - ID do funcionário
+     * @returns {Promise<Object>} Resultado da operação
+     */
     async deleteEmployee(id) {
         return this.request(`employees/${id}`, {
-            method: 'DELETE',
+            method: 'DELETE'
         });
     }
 

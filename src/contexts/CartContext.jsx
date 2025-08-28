@@ -31,8 +31,11 @@ export const CartProvider = ({ children }) => {
   // Atualizar estado local do carrinho
   const updateCartState = (cartData) => {
     setCart({
-      ...cartData,
-      itemCount: cartData.items.reduce((sum, item) => sum + item.quantity, 0)
+      items: cartData.items || [],
+      subtotal: cartData.subtotal || 0,
+      tax_amount: cartData.tax_amount || 0,
+      total: cartData.total || 0,
+      itemCount: (cartData.items || []).reduce((sum, item) => sum + item.quantity, 0)
     });
   };
 
@@ -50,9 +53,14 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Atualizar quantidade de um item no carrinho
+  // Atualizar quantidade de um item
   const updateItemQuantity = async (productId, newQuantity) => {
     try {
+      if (newQuantity <= 0) {
+        await removeFromCart(productId);
+        return;
+      }
+      
       setLoading(true);
       await cartService.updateItemQuantity(productId, newQuantity);
       await loadCart();
@@ -83,9 +91,24 @@ export const CartProvider = ({ children }) => {
     try {
       setLoading(true);
       await cartService.clearCart();
-      await loadCart();
+      updateCartState({ items: [], subtotal: 0, tax_amount: 0, total: 0 });
     } catch (err) {
       setError(err.message || 'Erro ao limpar carrinho');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Finalizar compra
+  const checkout = async (paymentMethod, customerId = null, notes = '') => {
+    try {
+      setLoading(true);
+      const result = await cartService.checkout(paymentMethod, customerId, notes);
+      await clearCart(); // Limpa o carrinho após finalizar a compra
+      return result;
+    } catch (err) {
+      setError(err.message || 'Erro ao finalizar compra');
       throw err;
     } finally {
       setLoading(false);
@@ -103,7 +126,7 @@ export const CartProvider = ({ children }) => {
     return item ? item.quantity : 0;
   };
 
-  // Efeito para carregar o carrinho quando o componente é montado
+  // Carregar carrinho ao montar o componente
   useEffect(() => {
     loadCart();
   }, []);
@@ -118,6 +141,7 @@ export const CartProvider = ({ children }) => {
         updateItemQuantity,
         removeFromCart,
         clearCart,
+        checkout,
         isInCart,
         getItemQuantity,
         loadCart

@@ -3,97 +3,131 @@ import {
   Plus, 
   Search, 
   Edit, 
-  Trash2, 
-  User,
-  Filter,
-  X
+  UserX, 
+  UserCheck, 
+  X 
 } from 'lucide-react';
 import apiService from '../services/api';
 
-const Usuarios = () => {
-  const [users, setUsers] = useState([]);
+// Componente auxiliar para exibir status
+const StatusBadge = ({ value }) => (
+  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+    value ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+  }`}>
+    {value ? 'Sim' : 'Não'}
+  </span>
+);
+
+const Funcionarios = () => {
+  // Estados
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingEmployee, setEditingEmployee] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Estados de paginação
+  const [pagination, setPagination] = useState({
+    page: 1,
+    size: 10,
+    total: 0,
+    pages: 1
+  });
+  
+  // Estados dos filtros
   const [filters, setFilters] = useState({
-    isAdmin: null,
-    canSupply: null,
-    isActive: true
+    is_admin: null,
+    can_sell: null,
+    is_active: true
   });
 
-  // Carregar usuários
-  const loadUsers = async () => {
+  // Carregar funcionários com paginação
+  const loadEmployees = async (page = 1, size = 10) => {
     try {
       setLoading(true);
-      const data = await apiService.getEmployees();
-      setUsers(data);
+      const params = { 
+        page, 
+        size, 
+        ...filters,
+        ...(searchTerm && { search: searchTerm })
+      };
+      
+      const data = await apiService.getEmployees(params);
+      
+      setEmployees(data.items || []);
+      setPagination({
+        page: data.page || 1,
+        size: data.size || 10,
+        total: data.total || 0,
+        pages: data.pages || 1
+      });
+      
       setError(null);
     } catch (err) {
       setError('Erro ao carregar funcionários');
-      console.error(err);
+      console.error('Erro ao carregar funcionários:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Efeito para carregar usuários ao montar o componente
+  // Carregar dados iniciais
   useEffect(() => {
-    loadUsers();
+    loadEmployees();
   }, []);
 
-  // Função para salvar/atualizar usuário
-  const handleSaveUser = async (userData) => {
+  // Função para salvar/atualizar funcionário
+  const handleSaveEmployee = async (employeeData) => {
     try {
       setError(null);
       
-      if (editingUser) {
-        await apiService.updateEmployee(editingUser.id, userData);
+      if (editingEmployee) {
+        await apiService.updateEmployee(editingEmployee.id, employeeData);
       } else {
-        await apiService.createEmployee(userData);
+        await apiService.createEmployee(employeeData);
       }
       
       setShowModal(false);
-      setEditingUser(null);
-      await loadUsers();
+      setEditingEmployee(null);
+      await loadEmployees();
     } catch (err) {
       setError(err.message || 'Erro ao salvar funcionário');
     }
   };
 
-  // Função para deletar usuário
-  const handleDeleteUser = async (id) => {
+  // Função para deletar funcionário
+  const handleDeleteEmployee = async (id) => {
     if (window.confirm('Tem certeza que deseja desativar este funcionário?')) {
       try {
         await apiService.updateEmployee(id, { is_active: false });
-        await loadUsers();
+        await loadEmployees();
       } catch (err) {
         setError('Erro ao desativar funcionário');
       }
     }
   };
 
-  // Função para ativar usuário
-  const handleActivateUser = async (id) => {
+  // Função para ativar funcionário
+  const handleActivateEmployee = async (id) => {
     try {
       await apiService.updateEmployee(id, { is_active: true });
-      await loadUsers();
+      await loadEmployees();
     } catch (err) {
       setError('Erro ao ativar funcionário');
     }
   };
 
-  // Filtrar usuários
-  const filteredUsers = users.filter(user => {
+  // Filtrar funcionários
+  const filteredEmployees = employees.filter(employee => {
     const matchesSearch = 
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase());
+      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.username.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilters = 
-      (filters.isAdmin === null || user.is_admin === filters.isAdmin) &&
-      (filters.canSupply === null || user.can_supply === filters.canSupply) &&
-      (filters.isActive === null || user.is_active === filters.isActive);
+      (filters.is_admin === null || employee.is_admin === filters.is_admin) &&
+      (filters.can_sell === null || employee.can_sell === filters.can_sell) &&
+      (filters.is_active === null || employee.is_active === filters.is_active);
     
     return matchesSearch && matchesFilters;
   });
@@ -117,7 +151,7 @@ const Usuarios = () => {
       );
     }
 
-    if (filteredUsers.length === 0) {
+    if (filteredEmployees.length === 0) {
       return (
         <div className="text-center py-8 text-gray-500">
           Nenhum funcionário encontrado
@@ -143,7 +177,7 @@ const Usuarios = () => {
                 Admin
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Abastecer
+                Vender
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
@@ -154,69 +188,51 @@ const Usuarios = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredUsers.map((user) => (
-              <tr key={user.id} className={!user.is_active ? 'bg-gray-50' : ''}>
+            {filteredEmployees.map((employee) => (
+              <tr key={employee.id} className={!employee.is_active ? 'bg-gray-50' : ''}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                  <div className="text-sm font-medium text-gray-900">{employee.name}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-500">{user.username}</div>
+                  <div className="text-sm text-gray-500">{employee.username}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
                     {new Intl.NumberFormat('pt-BR', {
                       style: 'currency',
                       currency: 'MZN'
-                    }).format(user.salary || 0)}
+                    }).format(employee.salary || 0)}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.is_admin 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {user.is_admin ? 'Sim' : 'Não'}
-                  </span>
+                  <StatusBadge value={employee.is_admin} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.can_supply 
-                      ? 'bg-blue-100 text-blue-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {user.can_supply ? 'Sim' : 'Não'}
-                  </span>
+                  <StatusBadge value={employee.can_sell} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.is_active 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {user.is_active ? 'Ativo' : 'Inativo'}
-                  </span>
+                  <StatusBadge value={employee.is_active} />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
                     onClick={() => {
-                      setEditingUser(user);
+                      setEditingEmployee(employee);
                       setShowModal(true);
                     }}
                     className="text-blue-600 hover:text-blue-900 mr-4"
                   >
                     Editar
                   </button>
-                  {user.is_active ? (
+                  {employee.is_active ? (
                     <button
-                      onClick={() => handleDeleteUser(user.id)}
+                      onClick={() => handleDeleteEmployee(employee.id)}
                       className="text-red-600 hover:text-red-900"
                     >
                       Desativar
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleActivateUser(user.id)}
+                      onClick={() => handleActivateEmployee(employee.id)}
                       className="text-green-600 hover:text-green-900"
                     >
                       Ativar
@@ -237,7 +253,7 @@ const Usuarios = () => {
         <h1 className="text-2xl font-bold text-gray-900">Gerenciar Funcionários</h1>
         <button
           onClick={() => {
-            setEditingUser(null);
+            setEditingEmployee(null);
             setShowModal(true);
           }}
           className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-900 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -274,10 +290,10 @@ const Usuarios = () => {
               Tipo
             </label>
             <select
-              value={filters.isAdmin ?? ''}
+              value={filters.is_admin ?? ''}
               onChange={(e) => setFilters({
                 ...filters,
-                isAdmin: e.target.value === '' ? null : e.target.value === 'true'
+                is_admin: e.target.value === '' ? null : e.target.value === 'true'
               })}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
             >
@@ -292,16 +308,16 @@ const Usuarios = () => {
               Permissão
             </label>
             <select
-              value={filters.canSupply ?? ''}
+              value={filters.can_sell ?? ''}
               onChange={(e) => setFilters({
                 ...filters,
-                canSupply: e.target.value === '' ? null : e.target.value === 'true'
+                can_sell: e.target.value === '' ? null : e.target.value === 'true'
               })}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
             >
               <option value="">Todas</option>
-              <option value="true">Pode abastecer</option>
-              <option value="false">Não pode abastecer</option>
+              <option value="true">Pode vender</option>
+              <option value="false">Não pode vender</option>
             </select>
           </div>
           
@@ -310,10 +326,10 @@ const Usuarios = () => {
               Status
             </label>
             <select
-              value={filters.isActive ?? ''}
+              value={filters.is_active ?? ''}
               onChange={(e) => setFilters({
                 ...filters,
-                isActive: e.target.value === '' ? null : e.target.value === 'true'
+                is_active: e.target.value === '' ? null : e.target.value === 'true'
               })}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
             >
@@ -333,11 +349,11 @@ const Usuarios = () => {
       {/* Modal */}
       {showModal && (
         <UserModal
-          user={editingUser}
-          onSave={handleSaveUser}
+          user={editingEmployee}
+          onSave={handleSaveEmployee}
           onClose={() => {
             setShowModal(false);
-            setEditingUser(null);
+            setEditingEmployee(null);
           }}
         />
       )}
@@ -347,34 +363,60 @@ const Usuarios = () => {
 
 const UserModal = ({ user, onSave, onClose }) => {
   const [formData, setFormData] = useState({
-    name: user?.name || '',
+    full_name: user?.full_name || '',
     username: user?.username || '',
     password: '',
-    salary: user?.salary ? String(user.salary) : '',
+    salary: user?.salary ? String(user.salary) : '0',
     is_admin: user?.is_admin || false,
-    can_supply: user?.can_supply || false
+    can_sell: user?.can_sell || false,
+    can_manage_inventory: user?.can_manage_inventory || false,
+    can_manage_expenses: user?.can_manage_expenses || false,
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.full_name.trim()) {
+      newErrors.full_name = 'Nome completo é obrigatório';
+    }
+    
+    if (!formData.username.trim()) {
+      newErrors.username = 'Nome de usuário é obrigatório';
+    }
+    
+    if (!user && !formData.password) {
+      newErrors.password = 'Senha é obrigatória';
+    } else if (formData.password && formData.password.length < 6) {
+      newErrors.password = 'A senha deve ter pelo menos 6 caracteres';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Validação básica
-    if (!formData.name || !formData.username || (!user && !formData.password)) {
-      alert('Por favor, preencha todos os campos obrigatórios');
+    if (!validateForm()) {
       return;
     }
     
-    if (formData.password && formData.password.length < 6) {
-      alert('A senha deve ter pelo menos 6 caracteres');
-      return;
+    const dataToSend = { ...formData };
+    
+    // Remover senha se não foi alterada
+    if (user && !dataToSend.password) {
+      delete dataToSend.password;
     }
     
-    onSave({
-      ...formData,
-      salary: parseFloat(formData.salary) || 0
-    });
+    // Converter salário para número
+    if (dataToSend.salary) {
+      dataToSend.salary = parseFloat(dataToSend.salary) || 0;
+    }
+    
+    onSave(dataToSend);
   };
 
   return (
@@ -399,11 +441,14 @@ const UserModal = ({ user, onSave, onClose }) => {
             </label>
             <input
               type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
+            {errors.full_name && (
+              <div className="text-red-500 text-sm mt-1">{errors.full_name}</div>
+            )}
           </div>
 
           <div>
@@ -417,6 +462,9 @@ const UserModal = ({ user, onSave, onClose }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
+            {errors.username && (
+              <div className="text-red-500 text-sm mt-1">{errors.username}</div>
+            )}
           </div>
 
           <div>
@@ -432,6 +480,9 @@ const UserModal = ({ user, onSave, onClose }) => {
                 required={!user}
                 placeholder={user ? 'Deixe em branco para não alterar' : ''}
               />
+              {errors.password && (
+                <div className="text-red-500 text-sm mt-1">{errors.password}</div>
+              )}
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -475,11 +526,31 @@ const UserModal = ({ user, onSave, onClose }) => {
             <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={formData.can_supply}
-                onChange={(e) => setFormData({ ...formData, can_supply: e.target.checked })}
+                checked={formData.can_sell}
+                onChange={(e) => setFormData({ ...formData, can_sell: e.target.checked })}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <span className="ml-2 text-sm text-gray-700">Pode Abastecer</span>
+              <span className="ml-2 text-sm text-gray-700">Pode vender</span>
+            </label>
+
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.can_manage_inventory}
+                onChange={(e) => setFormData({ ...formData, can_manage_inventory: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span className="ml-2 text-sm text-gray-700">Gerenciar estoque</span>
+            </label>
+
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.can_manage_expenses}
+                onChange={(e) => setFormData({ ...formData, can_manage_expenses: e.target.checked })}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span className="ml-2 text-sm text-gray-700">Gerenciar despesas</span>
             </label>
           </div>
 
@@ -504,4 +575,4 @@ const UserModal = ({ user, onSave, onClose }) => {
   );
 };
 
-export default Usuarios;
+export default Funcionarios;
