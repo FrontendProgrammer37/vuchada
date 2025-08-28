@@ -42,28 +42,47 @@ class ApiService {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
+            mode: 'cors', // Força o modo CORS
+            credentials: 'include', // Inclui credenciais se necessário
         };
 
         try {
             const response = await fetch(url, config);
             
-            // Se a resposta não for OK, lança um erro
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const error = new Error(errorData.message || 'Erro na requisição');
+                let errorMessage = 'Erro na requisição';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || JSON.stringify(errorData);
+                } catch (e) {
+                    errorMessage = await response.text();
+                }
+                
+                const error = new Error(errorMessage);
                 error.status = response.status;
-                error.data = errorData;
+                error.response = response;
                 throw error;
+            }
+
+            // Se a resposta for 204 (No Content), retorna null
+            if (response.status === 204) {
+                return null;
             }
 
             // Tenta fazer o parse da resposta como JSON
             try {
                 return await response.json();
             } catch (e) {
-                return {}; // Retorna um objeto vazio se não houver conteúdo JSON
+                console.warn('Resposta não é um JSON válido:', e);
+                return await response.text();
             }
         } catch (error) {
-            console.error('API Error:', error);
+            console.error('Erro na requisição:', {
+                url,
+                error: error.message,
+                status: error.status,
+                response: error.response ? await error.response.text() : null
+            });
             throw error;
         }
     }
@@ -183,35 +202,23 @@ class ApiService {
     }
 
     async createProduct(productData) {
-        // Converter do formato do frontend para o formato do backend
+        // Validate required fields
+        if (!productData.name) {
+            throw new Error('O nome do produto é obrigatório');
+        }
+        if (!productData.sku) {
+            throw new Error('O código SKU é obrigatório');
+        }
+        if (!productData.category_id) {
+            throw new Error('A categoria é obrigatória');
+        }
+
+        // Convert frontend format to backend format
         const formattedData = {
-            nome: productData.nome || '',
-            descricao: productData.descricao || null,
-            codigo: productData.codigo || null,
-            preco_compra: parseFloat(productData.preco_compra) || 0,
-            preco_venda: parseFloat(productData.preco_venda) || 0,
-            estoque: parseInt(productData.estoque) || 0,
-            estoque_minimo: parseInt(productData.estoque_minimo) || 0,
-            categoria_id: productData.categoria_id ? parseInt(productData.categoria_id) : null,
-            venda_por_peso: Boolean(productData.venda_por_peso)
-        };
-
-        console.log('Dados sendo enviados para a API:', JSON.stringify(formattedData, null, 2));
-
-        return this.request('products/', {
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(formattedData),
-        });
-    }
-
-    async updateProduct(id, productData) {
-        // Converter do formato do frontend para o formato do backend
-        const formattedData = {
-            codigo: productData.sku || null,
-            category_id: productData.category_id ? parseInt(productData.category_id) : null,
-            nome: productData.name || '',
-            descricao: productData.description || null,
+            codigo: productData.sku.toString().trim(),
+            category_id: parseInt(productData.category_id),
+            nome: productData.name.trim(),
+            descricao: productData.description ? productData.description.trim() : null,
             preco_compra: parseFloat(productData.cost_price) || 0,
             preco_venda: parseFloat(productData.sale_price) || 0,
             estoque: parseInt(productData.current_stock) || 0,
@@ -219,22 +226,107 @@ class ApiService {
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
 
-        console.log('Dados formatados para atualização:', JSON.stringify(formattedData, null, 2));
+        console.log('Enviando dados para a API:', JSON.stringify(formattedData, null, 2));
 
-        return this.request(`products/${id}`, {
-            method: 'PUT',
-            headers: this.getHeaders(),
-            body: JSON.stringify(formattedData),
-        }).catch(error => {
-            console.error('Erro ao atualizar produto:', error);
-            throw error;
-        });
+        try {
+            const response = await this.request('products/', {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify(formattedData),
+            });
+            console.log('Resposta da API:', response);
+            return response;
+        } catch (error) {
+            console.error('Erro ao criar produto:', error);
+            throw new Error(`Falha ao criar produto: ${error.message}`);
+        }
+    }
+
+    async updateProduct(id, productData) {
+        // Validações iniciais
+        if (!id) {
+            throw new Error('ID do produto é obrigatório para atualização');
+        }
+        if (!productData) {
+            throw new Error('Dados do produto são obrigatórios');
+        }
+
+        // Validar campos obrigatórios
+        if (!productData.name) {
+            throw new Error('O nome do produto é obrigatório');
+        }
+        if (!productData.sku) {
+            throw new Error('O código SKU é obrigatório');
+        }
+        if (!productData.category_id) {
+            throw new Error('A categoria é obrigatória');
+        }
+
+        // Converter do formato do frontend para o formato do backend
+        const formattedData = {
+            codigo: productData.sku.toString().trim(),
+            category_id: parseInt(productData.category_id),
+            nome: productData.name.trim(),
+            descricao: productData.description ? productData.description.trim() : null,
+            preco_compra: parseFloat(productData.cost_price) || 0,
+            preco_venda: parseFloat(productData.sale_price) || 0,
+            estoque: parseInt(productData.current_stock) || 0,
+            estoque_minimo: parseInt(productData.min_stock) || 0,
+            venda_por_peso: Boolean(productData.venda_por_peso)
+        };
+
+        console.log('Enviando dados para atualização:', JSON.stringify({
+            id,
+            ...formattedData
+        }, null, 2));
+
+        try {
+            const response = await this.request(`products/${id}`, {
+                method: 'PUT',
+                headers: this.getHeaders(),
+                body: JSON.stringify(formattedData),
+            });
+            
+            console.log('Produto atualizado com sucesso:', response);
+            return response;
+            
+        } catch (error) {
+            console.error('Erro ao atualizar produto:', {
+                id,
+                error: error.message,
+                status: error.status,
+                response: error.response
+            });
+            throw new Error(`Falha ao atualizar produto: ${error.message}`);
+        }
     }
 
     async deleteProduct(id) {
-        return this.request(`products/${id}`, {
-            method: 'DELETE',
-        });
+        // Validação do ID
+        if (!id) {
+            throw new Error('ID do produto é obrigatório para exclusão');
+        }
+
+        console.log(`Solicitando exclusão do produto com ID: ${id}`);
+
+        try {
+            const response = await this.request(`products/${id}`, {
+                method: 'DELETE',
+                headers: this.getHeaders()
+            });
+            
+            console.log('Produto excluído com sucesso:', response);
+            return response;
+            
+        } catch (error) {
+            console.error('Erro ao excluir produto:', {
+                id,
+                error: error.message,
+                status: error.status,
+                response: error.response
+            });
+            throw new Error(`Falha ao excluir produto: ${error.message}`);
+        }
     }
 
     async deleteAllProducts() {
