@@ -41,26 +41,15 @@ const Produtos = () => {
                 apiService.getCategories()
             ]);
             
-            // Mapear os campos da API para o formato esperado pelo frontend
-            const formattedProducts = productsData.map(product => ({
-                id: product.id,
-                name: product.nome || '',
-                description: product.descricao || '',
-                sku: product.codigo || '',
-                cost_price: product.preco_compra ? parseFloat(product.preco_compra) : 0,
-                sale_price: product.preco_venda ? parseFloat(product.preco_venda) : 0,
-                current_stock: product.estoque || 0,
-                min_stock: product.estoque_minimo || 0,
-                category_id: product.category_id || null,
-                venda_por_peso: product.venda_por_peso || false,
-                is_active: product.is_active !== false // Padrão para true se não definido
-            }));
+            console.log('Dados recebidos da API:', productsData); // Para debug
             
-            setProducts(formattedProducts);
+            // Os produtos já estão mapeados no apiService.getProducts()
+            setProducts(productsData);
             setCategories(categoriesData);
             setError(null);
         } catch (err) {
-            setError('Erro ao carregar dados: ' + err.message);
+            console.error('Erro ao carregar produtos:', err);
+            setError('Erro ao carregar dados: ' + (err.message || 'Erro desconhecido'));
         } finally {
             setLoading(false);
         }
