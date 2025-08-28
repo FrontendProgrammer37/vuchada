@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { CartProvider } from './contexts/CartContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Layout from './components/Layout';
@@ -11,7 +10,6 @@ import Funcionarios from './pages/Funcionarios';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import TodasVendas from './pages/TodasVendas';
-import PDVPage from './pages/PDVPage';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -30,15 +28,6 @@ const ProtectedRoute = ({ children }) => {
   }
   
   return children;
-};
-
-// Componente para rotas do PDV
-const PDVLayout = ({ children }) => {
-  return (
-    <CartProvider>
-      {children}
-    </CartProvider>
-  );
 };
 
 // Componente principal da aplicação
@@ -68,19 +57,6 @@ const AppContent = () => {
             </Layout>
           </ProtectedRoute>
         }
-      />
-      {/* Rota do PDV */}
-      <Route 
-        path="/pdv" 
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <PDVLayout>
-                <PDVPage />
-              </PDVLayout>
-            </Layout>
-          </ProtectedRoute>
-        } 
       />
       <Route
         path="/produtos"
