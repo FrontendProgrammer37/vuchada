@@ -24,7 +24,6 @@ const Layout = ({ children }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Todas Vendas', href: '/vendas', icon: ListOrdered },
     { name: 'Produtos', href: '/produtos', icon: Package },
     { name: 'Funcionários', href: '/funcionarios', icon: Users },
     { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
