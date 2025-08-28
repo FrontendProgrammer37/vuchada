@@ -166,28 +166,38 @@ const PDVPage = () => {
     setDiscount('');
   };
 
-  // Renderizar produto
+  // Renderizar produto na lista
   const renderProduct = (product) => (
     <div 
-      key={product.id}
-      className="bg-white rounded-lg shadow p-4 flex flex-col h-full"
+      key={product.id} 
+      className="bg-white rounded-lg shadow overflow-hidden border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
+      onClick={() => addToCart(product)}
     >
-      <div className="flex-1">
-        <h3 className="font-medium text-gray-900">{product.name}</h3>
-        {product.sku && <p className="text-xs text-gray-500 mb-1">{product.sku}</p>}
-        <p className="text-gray-600 text-sm">Estoque: {product.stock}</p>
-      </div>
-      <div className="mt-4 flex items-center justify-between">
-        <span className="text-lg font-bold">
-          {formatCurrency(product.price)}
-        </span>
+      <div className="p-4">
+        <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
+        <p className="text-sm text-gray-500 mb-2">{product.description || 'Sem descrição'}</p>
+        <div className="flex justify-between items-center">
+          <span className="text-lg font-bold text-blue-600">
+            {formatCurrency(product.price)}
+          </span>
+          <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {product.stock > 0 ? `${product.stock} em estoque` : 'Fora de estoque'}
+          </span>
+        </div>
         <button
-          onClick={() => addToCart(product)}
-          className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label={`Adicionar ${product.name} ao carrinho`}
+          onClick={(e) => {
+            e.stopPropagation();
+            addToCart(product);
+          }}
           disabled={product.stock <= 0}
+          className={`mt-3 w-full py-2 px-4 rounded-md flex items-center justify-center ${
+            product.stock > 0
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          }`}
         >
-          <Plus size={18} />
+          <Plus size={16} className="mr-1" />
+          Adicionar
         </button>
       </div>
     </div>
@@ -195,36 +205,55 @@ const PDVPage = () => {
 
   // Renderizar item do carrinho
   const renderCartItem = (item) => (
-    <div key={item.id} className="flex justify-between items-center py-3 border-b">
-      <div className="flex-1">
-        <h4 className="font-medium">{item.name}</h4>
-        <p className="text-sm text-gray-600">
-          {formatCurrency(item.price)} cada
-        </p>
-      </div>
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={() => updateQuantity(item.id, item.quantity - 1)}
-          className="text-gray-500 hover:text-blue-600 p-1"
-          aria-label="Diminuir quantidade"
-        >
-          <Minus size={16} />
-        </button>
-        <span className="w-6 text-center">{item.quantity}</span>
-        <button
-          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-          className="text-gray-500 hover:text-blue-600 p-1"
-          aria-label="Aumentar quantidade"
-        >
-          <Plus size={16} />
-        </button>
-        <button
-          onClick={() => removeFromCart(item.id)}
-          className="text-red-500 hover:text-red-700 p-1 ml-2"
-          aria-label="Remover item"
-        >
-          <Trash2 size={16} />
-        </button>
+    <div key={item.id} className="py-3 border-b">
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <h4 className="font-medium text-gray-900">{item.name}</h4>
+          <p className="text-sm text-gray-600">
+            {formatCurrency(item.price)} cada
+          </p>
+          {item.sku && <p className="text-xs text-gray-500 mt-1">SKU: {item.sku}</p>}
+        </div>
+        
+        <div className="flex flex-col items-end">
+          <div className="text-right font-medium text-gray-900 mb-2">
+            {formatCurrency(item.price * item.quantity)}
+          </div>
+          
+          <div className="flex items-center border rounded-md">
+            <button
+              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+              className="text-gray-500 hover:text-blue-600 p-1 px-2"
+              aria-label="Diminuir quantidade"
+            >
+              <Minus size={16} />
+            </button>
+            
+            <span className="w-8 text-center text-sm font-medium">
+              {item.quantity}
+            </span>
+            
+            <button
+              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+              className="text-gray-500 hover:text-blue-600 p-1 px-2"
+              aria-label="Aumentar quantidade"
+            >
+              <Plus size={16} />
+            </button>
+            
+            <button
+              onClick={() => removeFromCart(item.id)}
+              className="text-red-500 hover:text-red-700 p-1 px-2 ml-1"
+              aria-label="Remover item"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+          
+          <div className="mt-1 text-xs text-gray-500">
+            {item.quantity} × {formatCurrency(item.price)} = {formatCurrency(item.price * item.quantity)}
+          </div>
+        </div>
       </div>
     </div>
   );
