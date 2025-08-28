@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import apiService from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Componente para exibir o status do funcionário
 const StatusBadge = ({ isActive }) => (
@@ -152,16 +154,17 @@ const Funcionarios = () => {
         is_active: employeeData.is_active !== undefined ? employeeData.is_active : true
       };
 
-      // Se for uma atualização e não for para alterar a senha, remover a senha
+      // Se for uma atualização
       if (employeeData.id) {
-        if (employeeData.password) {
+        // Incluir senha apenas se fornecida e não vazia
+        if (employeeData.password && employeeData.password.trim() !== '') {
           employeeToSave.password = employeeData.password;
         }
         await apiService.updateEmployee(employeeData.id, employeeToSave);
         toast.success('Funcionário atualizado com sucesso!');
       } else {
         // Para criação, a senha é obrigatória
-        if (!employeeData.password) {
+        if (!employeeData.password || employeeData.password.trim() === '') {
           throw new Error('A senha é obrigatória para novo funcionário');
         }
         employeeToSave.password = employeeData.password;
@@ -171,12 +174,15 @@ const Funcionarios = () => {
 
       // Fechar o modal e recarregar a lista
       setShowModal(false);
-      setEditingEmployee(null); // Limpar o usuário em edição
+      setEditingEmployee(null);
       await loadEmployees(pagination.page, pagination.size);
       
     } catch (error) {
       console.error('Erro ao salvar funcionário:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar funcionário');
+      const errorMessage = error.response?.data?.detail || error.message || 'Erro ao salvar funcionário';
+      toast.error(errorMessage);
+      // Não fechar o modal em caso de erro
+      return Promise.reject(error);
     } finally {
       setLoading(false);
     }
@@ -558,7 +564,7 @@ const UserModal = ({ user, onSave, onClose }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -582,7 +588,13 @@ const UserModal = ({ user, onSave, onClose }) => {
       dataToSend.salary = parseFloat(dataToSend.salary) || 0;
     }
     
-    onSave(dataToSend);
+    try {
+      await onSave(dataToSend);
+      // O fechamento do modal é tratado dentro do onSave
+    } catch (error) {
+      // O erro já é tratado dentro do onSave
+      console.error('Erro ao processar o formulário:', error);
+    }
   };
 
   return (
