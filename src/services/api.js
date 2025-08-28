@@ -150,13 +150,13 @@ class ApiService {
         // Mapear os campos do backend para o formato esperado pelo frontend
         return data.map(product => ({
             id: product.id,
-            name: product.name,
-            description: product.description,
-            sku: product.sku,
-            cost_price: parseFloat(product.cost_price) || 0,
-            sale_price: parseFloat(product.sale_price) || 0,
-            current_stock: product.current_stock || 0,
-            min_stock: product.min_stock || 0,
+            name: product.nome,
+            description: product.descricao,
+            sku: product.codigo,
+            cost_price: parseFloat(product.preco_compra) || 0,
+            sale_price: parseFloat(product.preco_venda) || 0,
+            current_stock: product.estoque || 0,
+            min_stock: product.estoque_minimo || 0,
             category_id: product.category_id,
             venda_por_peso: product.venda_por_peso || false,
             is_active: product.is_active !== false
@@ -169,13 +169,13 @@ class ApiService {
         // Mapear os campos do backend para o formato esperado pelo frontend
         return {
             id: product.id,
-            name: product.name,
-            description: product.description,
-            sku: product.sku,
-            cost_price: parseFloat(product.cost_price) || 0,
-            sale_price: parseFloat(product.sale_price) || 0,
-            current_stock: product.current_stock || 0,
-            min_stock: product.min_stock || 0,
+            name: product.nome,
+            description: product.descricao,
+            sku: product.codigo,
+            cost_price: parseFloat(product.preco_compra) || 0,
+            sale_price: parseFloat(product.preco_venda) || 0,
+            current_stock: product.estoque || 0,
+            min_stock: product.estoque_minimo || 0,
             category_id: product.category_id,
             venda_por_peso: product.venda_por_peso || false,
             is_active: product.is_active !== false
