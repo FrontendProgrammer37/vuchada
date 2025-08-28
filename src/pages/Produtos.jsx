@@ -41,7 +41,22 @@ const Produtos = () => {
                 apiService.getCategories()
             ]);
             
-            setProducts(productsData);
+            // Mapear os campos da API para o formato esperado pelo frontend
+            const formattedProducts = productsData.map(product => ({
+                id: product.id,
+                name: product.nome || '',
+                description: product.descricao || '',
+                sku: product.codigo || '',
+                cost_price: product.preco_compra ? parseFloat(product.preco_compra) : 0,
+                sale_price: product.preco_venda ? parseFloat(product.preco_venda) : 0,
+                current_stock: product.estoque || 0,
+                min_stock: product.estoque_minimo || 0,
+                category_id: product.category_id || null,
+                venda_por_peso: product.venda_por_peso || false,
+                is_active: product.is_active !== false // Padrão para true se não definido
+            }));
+            
+            setProducts(formattedProducts);
             setCategories(categoriesData);
             setError(null);
         } catch (err) {

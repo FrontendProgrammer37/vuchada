@@ -145,23 +145,53 @@ class ApiService {
         const queryString = params.toString();
         const endpoint = `products/${queryString ? `?${queryString}` : ''}`;
         
-        return this.request(endpoint);
+        const data = await this.request(endpoint);
+        
+        // Mapear os campos do backend para o formato esperado pelo frontend
+        return data.map(product => ({
+            id: product.id,
+            name: product.nome,
+            description: product.descricao,
+            sku: product.codigo,
+            cost_price: parseFloat(product.preco_compra) || 0,
+            sale_price: parseFloat(product.preco_venda) || 0,
+            current_stock: product.estoque || 0,
+            min_stock: product.estoque_minimo || 0,
+            category_id: product.category_id,
+            venda_por_peso: product.venda_por_peso || false,
+            is_active: product.is_active !== false
+        }));
     }
 
     async getProduct(id) {
-        return this.request(`products/${id}`);
+        const product = await this.request(`products/${id}`);
+        
+        // Mapear os campos do backend para o formato esperado pelo frontend
+        return {
+            id: product.id,
+            name: product.nome,
+            description: product.descricao,
+            sku: product.codigo,
+            cost_price: parseFloat(product.preco_compra) || 0,
+            sale_price: parseFloat(product.preco_venda) || 0,
+            current_stock: product.estoque || 0,
+            min_stock: product.estoque_minimo || 0,
+            category_id: product.category_id,
+            venda_por_peso: product.venda_por_peso || false,
+            is_active: product.is_active !== false
+        };
     }
 
     async createProduct(productData) {
-        // Garantir que os dados estejam no formato correto
+        // Converter do formato do frontend para o formato do backend
         const formattedData = {
-            name: productData.name,
-            description: productData.description || null,
-            sku: productData.sku || null,
-            cost_price: parseFloat(productData.cost_price) || 0,
-            sale_price: parseFloat(productData.sale_price) || 0,
-            current_stock: parseInt(productData.current_stock) || 0,
-            min_stock: parseInt(productData.min_stock) || 0,
+            nome: productData.name,
+            descricao: productData.description || null,
+            codigo: productData.sku || null,
+            preco_compra: productData.cost_price?.toString() || '0',
+            preco_venda: productData.sale_price?.toString() || '0',
+            estoque: parseInt(productData.current_stock) || 0,
+            estoque_minimo: parseInt(productData.min_stock) || 0,
             category_id: productData.category_id || null,
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
@@ -173,15 +203,15 @@ class ApiService {
     }
 
     async updateProduct(id, productData) {
-        // Garantir que os dados estejam no formato correto
+        // Converter do formato do frontend para o formato do backend
         const formattedData = {
-            name: productData.name,
-            description: productData.description || null,
-            sku: productData.sku || null,
-            cost_price: parseFloat(productData.cost_price) || 0,
-            sale_price: parseFloat(productData.sale_price) || 0,
-            current_stock: parseInt(productData.current_stock) || 0,
-            min_stock: parseInt(productData.min_stock) || 0,
+            nome: productData.name,
+            descricao: productData.description || null,
+            codigo: productData.sku || null,
+            preco_compra: productData.cost_price?.toString() || '0',
+            preco_venda: productData.sale_price?.toString() || '0',
+            estoque: parseInt(productData.current_stock) || 0,
+            estoque_minimo: parseInt(productData.min_stock) || 0,
             category_id: productData.category_id || null,
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
