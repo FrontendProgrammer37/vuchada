@@ -86,6 +86,8 @@ const Funcionarios = () => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
 
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
   // Carregar funcionários com paginação
   const loadEmployees = async (page = 1, size = 10) => {
     try {
