@@ -491,40 +491,50 @@ class ApiService {
 
     // ===== CARRINHO =====
     
-    // Adicionar item ao carrinho
-    async addToCart(productId, quantity = 1) {
-        return this.request('cart/add', {
-            method: 'POST',
-            body: JSON.stringify({
-                product_id: productId,
-                quantity: quantity
-            })
-        });
-    }
-
-    // Remover item do carrinho
-    async removeFromCart(productId) {
-        return this.request(`cart/remove/${productId}`, {
-            method: 'DELETE'
-        });
-    }
-
-    // Atualizar quantidade no carrinho
-    async updateCartItem(productId, quantity) {
-        return this.request(`cart/update/${productId}`, {
-            method: 'PUT',
-            body: JSON.stringify({ quantity })
-        });
-    }
-
-    // Obter carrinho atual
     async getCart() {
         return this.request('cart');
     }
 
-    // Limpar carrinho
+    async addToCart(productId, quantity = 1) {
+        if (!productId) {
+            throw new Error('ID do produto é obrigatório');
+        }
+        
+        return this.request('cart/items', {
+            method: 'POST',
+            body: JSON.stringify({ 
+                product_id: productId, 
+                quantity: parseInt(quantity) 
+            })
+        });
+    }
+
+    async updateCartItem(itemId, quantity) {
+        if (!itemId) {
+            throw new Error('ID do item é obrigatório');
+        }
+        if (!quantity || quantity < 1) {
+            throw new Error('Quantidade deve ser maior que zero');
+        }
+        
+        return this.request(`cart/items/${itemId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ quantity: parseInt(quantity) })
+        });
+    }
+
+    async removeFromCart(itemId) {
+        if (!itemId) {
+            throw new Error('ID do item é obrigatório');
+        }
+        
+        return this.request(`cart/items/${itemId}`, {
+            method: 'DELETE'
+        });
+    }
+
     async clearCart() {
-        return this.request('cart/clear', {
+        return this.request('cart', {
             method: 'DELETE'
         });
     }

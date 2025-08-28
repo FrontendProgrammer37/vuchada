@@ -111,57 +111,72 @@ const EfetuarVendaPDV = () => {
   };
 
   // Função para adicionar produto ao carrinho
-  const adicionarAoCarrinho = (produto) => {
+  const adicionarAoCarrinho = async (produto) => {
     if (produto.stock_quantity <= 0) {
       setErro(`Produto "${produto.name}" sem estoque disponível.`);
       return;
     }
     
-    setCarrinho(prevCarrinho => {
-      const itemExistente = prevCarrinho.find(item => item.id === produto.id);
-      const precoValido = isNaN(Number(produto.price)) ? 0 : Number(produto.price);
+    try {
+      await apiService.addToCart(produto.id, 1);
       
-      if (itemExistente) {
-        if (itemExistente.quantidade >= produto.stock_quantity) {
-          setErro(`Estoque insuficiente para o produto "${produto.name}".`);
-          return prevCarrinho;
-        }
+      // Atualizar estado local
+      setCarrinho(prevCarrinho => {
+        const itemExistente = prevCarrinho.find(item => item.id === produto.id);
+        const precoValido = isNaN(Number(produto.price)) ? 0 : Number(produto.price);
         
-        return prevCarrinho.map(item => 
-          item.id === produto.id 
-            ? { ...item, quantidade: item.quantidade + 1 } 
-            : item
-        );
-      } else {
-        return [...prevCarrinho, {
-          id: produto.id,
-          nome: produto.name,
-          preco: precoValido,
-          quantidade: 1,
-          imagem: produto.image_url,
-          codigo: produto.barcode || produto.id.toString(),
-          stock_quantity: produto.stock_quantity
-        }];
+        if (itemExistente) {
+          if (itemExistente.quantidade >= produto.stock_quantity) {
+            setErro(`Estoque insuficiente para o produto "${produto.name}".`);
+            return prevCarrinho;
+          }
+          
+          return prevCarrinho.map(item => 
+            item.id === produto.id 
+              ? { ...item, quantidade: item.quantidade + 1 } 
+              : item
+          );
+        } else {
+          return [...prevCarrinho, {
+            id: produto.id,
+            nome: produto.name,
+            preco: precoValido,
+            quantidade: 1,
+            imagem: produto.image_url,
+            codigo: produto.barcode || produto.id.toString(),
+            stock_quantity: produto.stock_quantity
+          }];
+        }
+      });
+      
+      // Limpar mensagem de erro e focar na busca
+      setErro(null);
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
       }
-    });
-    
-    // Limpar mensagem de erro e focar na busca
-    setErro(null);
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
+      setTermoBusca('');
+      
+    } catch (error) {
+      console.error('Erro ao adicionar ao carrinho:', error);
+      setErro(`Erro ao adicionar ao carrinho: ${error.message}`);
     }
-    setTermoBusca('');
   };
 
   // Função para remover produto do carrinho
-  const removerDoCarrinho = (produtoId) => {
-    setCarrinho(prevCarrinho => prevCarrinho.filter(item => item.id !== produtoId));
+  const removerDoCarrinho = async (produtoId) => {
+    try {
+      await apiService.removeFromCart(produtoId);
+      setCarrinho(prevCarrinho => prevCarrinho.filter(item => item.id !== produtoId));
+    } catch (error) {
+      console.error('Erro ao remover do carrinho:', error);
+      setErro('Erro ao remover item do carrinho');
+    }
   };
 
   // Função para alterar quantidade de produto no carrinho
-  const alterarQuantidade = (produtoId, novaQuantidade) => {
+  const alterarQuantidade = async (produtoId, novaQuantidade) => {
     if (novaQuantidade <= 0) {
-      removerDoCarrinho(produtoId);
+      await removerDoCarrinho(produtoId);
       return;
     }
     
@@ -171,21 +186,34 @@ const EfetuarVendaPDV = () => {
       return;
     }
     
-    setCarrinho(prevCarrinho => 
-      prevCarrinho.map(item => 
-        item.id === produtoId 
-          ? { ...item, quantidade: novaQuantidade } 
-          : item
-      )
-    );
-    
-    // Limpar mensagem de erro
-    setErro(null);
+    try {
+      await apiService.updateCartItem(produtoId, novaQuantidade);
+      
+      setCarrinho(prevCarrinho => 
+        prevCarrinho.map(item => 
+          item.id === produtoId 
+            ? { ...item, quantidade: novaQuantidade } 
+            : item
+        )
+      );
+      
+      // Limpar mensagem de erro
+      setErro(null);
+    } catch (error) {
+      console.error('Erro ao atualizar quantidade:', error);
+      setErro('Erro ao atualizar quantidade do item');
+    }
   };
 
   // Função para limpar carrinho
-  const limparCarrinho = () => {
-    setCarrinho([]);
+  const limparCarrinho = async () => {
+    try {
+      await apiService.clearCart();
+      setCarrinho([]);
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      setErro('Erro ao limpar o carrinho');
+    }
   };
 
   // Função para abrir modal de pagamento
@@ -227,7 +255,9 @@ const EfetuarVendaPDV = () => {
       const vendaData = {
         payment_method: formaPagamento,
         customer_id: null, // Pode ser obtido de um campo de seleção de cliente
-        notes: `Venda realizada em ${new Date().toLocaleString()}`
+        notes: `Venda realizada em ${new Date().toLocaleString()}`,
+        amount_paid: formaPagamento === 'DINHEIRO' ? Number(valorRecebido) : total,
+        payment_note: ''
       };
 
       const resultadoVenda = await apiService.createSale(vendaData);

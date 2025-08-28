@@ -69,15 +69,18 @@ const AppContent = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/pdv"
+      {/* Rota do PDV */}
+      <Route 
+        path="/pdv" 
         element={
           <ProtectedRoute>
-            <PDVLayout>
-              <PDVPage />
-            </PDVLayout>
+            <Layout>
+              <PDVLayout>
+                <PDVPage />
+              </PDVLayout>
+            </Layout>
           </ProtectedRoute>
-        }
+        } 
       />
       <Route
         path="/produtos"
