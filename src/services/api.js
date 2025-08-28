@@ -192,10 +192,12 @@ class ApiService {
             preco_venda: (productData.sale_price || 0).toString(),
             estoque: parseInt(productData.current_stock) || 0,
             estoque_minimo: parseInt(productData.min_stock) || 0,
-            category_id: productData.category_id || null,
+            category_id: productData.category_id ? parseInt(productData.category_id) : null,
             venda_por_peso: Boolean(productData.venda_por_peso),
-            is_active: true  // Adicionando o campo is_active como true por padrão
+            is_active: true
         };
+
+        console.log('Enviando dados para a API:', formattedData); // Para debug
 
         return this.request('products/', {
             method: 'POST',
