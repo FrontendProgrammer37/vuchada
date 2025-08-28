@@ -101,18 +101,30 @@ const Funcionarios = () => {
       
       const data = await apiService.getEmployees(params);
       
-      setEmployees(data.items || []);
-      setPagination({
-        page: data.page || 1,
-        size: data.size || 10,
-        total: data.total || 0,
-        pages: data.pages || 1
-      });
+      // Atualizado para lidar com o formato de resposta da API
+      if (Array.isArray(data)) {
+        setEmployees(data);
+        setPagination(prev => ({
+          ...prev,
+          page: 1,
+          total: data.length,
+          pages: 1
+        }));
+      } else {
+        setEmployees(data.items || data.data || []);
+        setPagination({
+          page: data.page || 1,
+          size: data.size || data.per_page || 10,
+          total: data.total || (Array.isArray(data) ? data.length : 0),
+          pages: data.pages || data.total_pages || 1
+        });
+      }
       
       setError(null);
     } catch (err) {
-      setError('Erro ao carregar funcionários');
       console.error('Erro ao carregar funcionários:', err);
+      setError('Erro ao carregar a lista de funcionários. Tente novamente mais tarde.');
+      setEmployees([]);
     } finally {
       setLoading(false);
     }
@@ -197,6 +209,12 @@ const Funcionarios = () => {
     }));
     // Resetar para a primeira página ao mudar os filtros
     setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  // Função para abrir o modal de edição/criação
+  const handleOpenModal = (user = null) => {
+    setEditingEmployee(user);
+    setShowModal(true);
   };
 
   // Filtrar funcionários
@@ -334,7 +352,7 @@ const Funcionarios = () => {
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Gerenciar Funcionários</h1>
         <button
-          onClick={() => handleOpenModal()}
+          onClick={handleOpenModal}
           className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
           <Plus className="h-4 w-4 mr-2" />
