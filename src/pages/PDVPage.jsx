@@ -5,6 +5,16 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import apiService from '../services/api';
 
+// Função para formatar valores em Metical (MZN)
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('pt-MZ', {
+    style: 'currency',
+    currency: 'MZN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+};
+
 const PDVPage = () => {
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
@@ -169,7 +179,7 @@ const PDVPage = () => {
       </div>
       <div className="mt-4 flex items-center justify-between">
         <span className="text-lg font-bold">
-          {product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          {formatCurrency(product.price)}
         </span>
         <button
           onClick={() => addToCart(product)}
@@ -189,7 +199,7 @@ const PDVPage = () => {
       <div className="flex-1">
         <h4 className="font-medium">{item.name}</h4>
         <p className="text-sm text-gray-600">
-          {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          {formatCurrency(item.price)} cada
         </p>
       </div>
       <div className="flex items-center space-x-2">
@@ -309,7 +319,7 @@ const PDVPage = () => {
                     <div className="flex justify-between mb-2">
                       <span>Subtotal:</span>
                       <span className="font-medium">
-                        {cartTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        {formatCurrency(cartTotal)}
                       </span>
                     </div>
                     
@@ -423,7 +433,7 @@ const PDVPage = () => {
                     </div>
                     {amountReceived && parseFloat(amountReceived) < (cartTotal - (parseFloat(discount) || 0)) && (
                       <p className="mt-1 text-sm text-red-600">
-                        Valor insuficiente. Faltam {((cartTotal - (parseFloat(discount) || 0)) - parseFloat(amountReceived)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        Valor insuficiente. Faltam {formatCurrency((cartTotal - (parseFloat(discount) || 0)) - parseFloat(amountReceived))}
                       </p>
                     )}
                   </div>
@@ -454,14 +464,14 @@ const PDVPage = () => {
                   <div className="flex justify-between mb-2">
                     <span>Total:</span>
                     <span className="font-bold">
-                      {cartTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {formatCurrency(cartTotal)}
                     </span>
                   </div>
                   
                   {parseFloat(discount) > 0 && (
                     <div className="flex justify-between mb-2 text-red-600">
                       <span>Desconto:</span>
-                      <span>-{parseFloat(discount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                      <span>-{formatCurrency(parseFloat(discount))}</span>
                     </div>
                   )}
                   
@@ -470,7 +480,7 @@ const PDVPage = () => {
                       <span>Troco:</span>
                       <span className="font-medium">
                         {change > 0 
-                          ? change.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                          ? formatCurrency(change)
                           : 'Sem troco'}
                       </span>
                     </div>
