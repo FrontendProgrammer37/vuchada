@@ -185,16 +185,18 @@ class ApiService {
     async createProduct(productData) {
         // Converter do formato do frontend para o formato do backend
         const formattedData = {
-            name: productData.name || '',
-            description: productData.description || null,
-            sku: productData.sku || null,
-            cost_price: parseFloat(productData.cost_price) || 0,
-            sale_price: parseFloat(productData.sale_price) || 0,
-            current_stock: parseInt(productData.current_stock) || 0,
-            min_stock: parseInt(productData.min_stock) || 0,
-            category_id: productData.category_id ? parseInt(productData.category_id) : null,
+            nome: productData.nome || '',
+            descricao: productData.descricao || null,
+            codigo: productData.codigo || null,
+            preco_compra: parseFloat(productData.preco_compra) || 0,
+            preco_venda: parseFloat(productData.preco_venda) || 0,
+            estoque: parseInt(productData.estoque) || 0,
+            estoque_minimo: parseInt(productData.estoque_minimo) || 0,
+            categoria_id: productData.categoria_id ? parseInt(productData.categoria_id) : null,
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
+
+        console.log('Dados sendo enviados para a API:', JSON.stringify(formattedData, null, 2));
 
         return this.request('products/', {
             method: 'POST',
@@ -206,14 +208,14 @@ class ApiService {
     async updateProduct(id, productData) {
         // Converter do formato do frontend para o formato do backend
         const formattedData = {
-            name: productData.name || '',
-            description: productData.description || null,
-            sku: productData.sku || null,
-            cost_price: parseFloat(productData.cost_price) || 0,
-            sale_price: parseFloat(productData.sale_price) || 0,
-            current_stock: parseInt(productData.current_stock) || 0,
-            min_stock: parseInt(productData.min_stock) || 0,
-            category_id: productData.category_id ? parseInt(productData.category_id) : null,
+            nome: productData.nome || '',
+            descricao: productData.descricao || null,
+            codigo: productData.codigo || null,
+            preco_compra: parseFloat(productData.preco_compra) || 0,
+            preco_venda: parseFloat(productData.preco_venda) || 0,
+            estoque: parseInt(productData.estoque) || 0,
+            estoque_minimo: parseInt(productData.estoque_minimo) || 0,
+            categoria_id: productData.categoria_id ? parseInt(productData.categoria_id) : null,
             venda_por_peso: Boolean(productData.venda_por_peso)
         };
 
