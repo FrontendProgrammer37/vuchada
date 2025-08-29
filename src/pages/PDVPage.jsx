@@ -132,23 +132,23 @@ const PDVPage = () => {
     try {
       const result = await apiService.request('cart/checkout', {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
+          payment_method: 'dinheiro', // Make sure to include the payment method
           items: cart.map(item => ({
             product_id: item.id,
             quantity: item.quantity,
-            unit_price: item.sale_price,
-            subtotal: item.sale_price * item.quantity
-          })),
-          total: cartTotal,
-          // Adicione outros campos necessários aqui, como dados do cliente, pagamento, etc.
-        })
+            unit_price: item.sale_price || item.price, // Fallback to price if sale_price is not available
+            subtotal: (item.sale_price || item.price) * item.quantity
+          }))
+        }
       });
+      
       alert(`Venda finalizada com sucesso! Número da venda: ${result.sale_number}`);
       setCart([]);
       setShowCart(false);
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
-      alert('Erro ao finalizar venda. Verifique o console para mais detalhes.');
+      alert(`Erro ao finalizar venda: ${error.message || 'Verifique o console para mais detalhes'}`);
     }
   };
 
