@@ -101,25 +101,98 @@ class ApiService {
         formData.append('username', username);
         formData.append('password', password);
 
-        // O endpoint de login espera 'x-www-form-urlencoded', então não usamos o header padrão
-        const data = await this.request('auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData.toString(),
-        });
+        try {
+            const response = await fetch(`${this.baseURL}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData.toString(),
+            });
 
-        this.setToken(data.access_token);
-        return data;
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.detail || 'Falha no login');
+            }
+
+            this.setToken(data.access_token);
+            // Salva os dados do usuário no localStorage
+            if (data.user) {
+                localStorage.setItem('user', JSON.stringify(data.user));
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('Erro no login:', error);
+            throw error;
+        }
     }
 
     async logout() {
-        this.removeToken();
+        try {
+            await this.request('auth/logout', { method: 'POST' });
+        } catch (error) {
+            console.warn('Erro ao fazer logout no servidor:', error);
+        } finally {
+            this.removeToken();
+            localStorage.removeItem('user');
+        }
     }
 
     async getCurrentUser() {
-        return this.request('auth/me');
+        try {
+            const user = await this.request('auth/me');
+            if (user) {
+                localStorage.setItem('user', JSON.stringify(user));
+            }
+            return user;
+        } catch (error) {
+            if (error.status === 401) {
+                this.removeToken();
+                localStorage.removeItem('user');
+            }
+            throw error;
+        }
+    }
+
+    // Funções de verificação de permissões
+    hasPermission(permission) {
+        const user = this.getCurrentUserFromStorage();
+        if (!user) return false;
+        
+        // Se for admin, tem todas as permissões
+        if (user.role === 'admin') return true;
+        
+        // Se for funcionário, verifica as permissões específicas
+        if (user.role === 'employee' && user.permissions) {
+            return user.permissions[permission] === true;
+        }
+        
+        return false;
+    }
+
+    // Verifica se o usuário atual é um funcionário
+    isEmployee() {
+        const user = this.getCurrentUserFromStorage();
+        return user?.role === 'employee';
+    }
+
+    // Verifica se o usuário atual é um administrador
+    isAdmin() {
+        const user = this.getCurrentUserFromStorage();
+        return user?.role === 'admin';
+    }
+
+    // Obtém o usuário atual do localStorage
+    getCurrentUserFromStorage() {
+        try {
+            const userStr = localStorage.getItem('user');
+            return userStr ? JSON.parse(userStr) : null;
+        } catch (error) {
+            console.error('Erro ao obter usuário do localStorage:', error);
+            return null;
+        }
     }
 
     // ===== CATEGORIAS =====

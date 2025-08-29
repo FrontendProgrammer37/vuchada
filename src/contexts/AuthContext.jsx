@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import apiService from '../services/api';
 
 const AuthContext = createContext();
@@ -16,30 +16,52 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Verificar se há token salvo ao carregar a aplicação
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            checkAuth();
-        } else {
+    // Carrega o usuário do localStorage na inicialização
+    const loadUserFromStorage = useCallback(() => {
+        try {
+            const userData = apiService.getCurrentUserFromStorage();
+            if (userData) {
+                setUser(userData);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar usuário do localStorage:', error);
+        }
+    }, []);
+
+    // Verifica a autenticação no servidor
+    const checkAuth = useCallback(async () => {
+        try {
+            setLoading(true);
+            const userData = await apiService.getCurrentUser();
+            setUser(userData);
+            setError(null);
+            return userData;
+        } catch (error) {
+            console.error('Erro ao verificar autenticação:', error);
+            if (error.status === 401) {
+                // Token inválido ou expirado
+                apiService.logout();
+                setUser(null);
+            }
+            throw error;
+        } finally {
             setLoading(false);
         }
     }, []);
 
-    // Verificar autenticação com o token salvo
-    const checkAuth = async () => {
-        try {
-            const userData = await apiService.getCurrentUser();
-            setUser(userData);
-            setError(null);
-        } catch (err) {
-            console.error('Erro ao verificar autenticação:', err);
-            apiService.removeToken();
-            setUser(null);
-        } finally {
+    // Verifica autenticação ao carregar o componente
+    useEffect(() => {
+        loadUserFromStorage();
+        
+        const token = localStorage.getItem('token');
+        if (token) {
+            checkAuth().catch(() => {
+                // Se houver erro, o estado já foi limpo no checkAuth
+            });
+        } else {
             setLoading(false);
         }
-    };
+    }, [loadUserFromStorage, checkAuth]);
 
     // Login
     const login = async (username, password) => {
@@ -48,28 +70,48 @@ export const AuthProvider = ({ children }) => {
             setError(null);
             
             const response = await apiService.login(username, password);
-            const userData = await apiService.getCurrentUser();
-            
-            setUser(userData);
-            return { success: true };
-        } catch (err) {
-            setError(err.message || 'Erro no login');
-            return { success: false, error: err.message };
+            setUser(response.user || response);
+            return response;
+        } catch (error) {
+            console.error('Erro no login:', error);
+            setError(error.message || 'Erro ao fazer login');
+            throw error;
         } finally {
             setLoading(false);
         }
     };
 
     // Logout
-    const logout = () => {
-        apiService.logout();
-        setUser(null);
-        setError(null);
+    const logout = async () => {
+        try {
+            await apiService.logout();
+        } catch (error) {
+            console.error('Erro ao fazer logout:', error);
+        } finally {
+            setUser(null);
+            setError(null);
+        }
     };
 
-    // Limpar erro
-    const clearError = () => {
-        setError(null);
+    // Verifica se o usuário tem uma permissão específica
+    const hasPermission = (permission) => {
+        if (!user) return false;
+        return apiService.hasPermission(permission);
+    };
+
+    // Verifica se o usuário é um funcionário
+    const isEmployee = () => {
+        return user?.role === 'employee';
+    };
+
+    // Verifica se o usuário é um administrador
+    const isAdmin = () => {
+        return user?.role === 'admin';
+    };
+
+    // Verifica se o usuário está autenticado
+    const isAuthenticated = () => {
+        return !!user;
     };
 
     const value = {
@@ -78,14 +120,18 @@ export const AuthProvider = ({ children }) => {
         error,
         login,
         logout,
-        clearError,
-        isAuthenticated: !!user,
-        isAdmin: user?.role === 'admin' || user?.is_superuser,
+        checkAuth,
+        hasPermission,
+        isEmployee,
+        isAdmin,
+        isAuthenticated,
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {children}
+            {!loading && children}
         </AuthContext.Provider>
     );
-}; 
+};
+
+export default AuthContext;
