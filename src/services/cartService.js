@@ -91,18 +91,25 @@ const cartService = {
   },
 
   // Finalizar compra/checkout
-  async checkout(items, total) {
+  async checkout() {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
+      const response = await apiService.request('cart/checkout', {
         method: 'POST',
         body: {
-          items,
-          total
+          payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
+          items: (await this.getCart()).items.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity
+          }))
         }
       });
+      
+      // Clear cart after successful checkout
+      await this.clearCart();
+      
       return response;
     } catch (error) {
-      console.error('Erro ao finalizar compra:', error);
+      console.error('Erro ao finalizar venda:', error);
       throw error;
     }
   }

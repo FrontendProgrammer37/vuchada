@@ -124,47 +124,81 @@ const PDVPage = () => {
 
   // Função para finalizar a venda
   const handleCheckout = async () => {
+    if (cart.length === 0) {
+      alert('Adicione itens ao carrinho antes de finalizar a venda');
+      return;
+    }
+
     try {
-      // Mapear os itens do carrinho para o formato esperado pela API
-      const items = cart.map(item => ({
-        product_id: item.id,
-        quantity: item.quantity,
-        unit_price: item.sale_price,
-        subtotal: item.sale_price * item.quantity
-      }));
-
-      // Calcular o total da venda
-      const total = cart.reduce((sum, item) => sum + (item.sale_price * item.quantity), 0);
-
-      // Enviar os dados para a API
-      const response = await apiService.request('cart/checkout', {
+      const result = await apiService.request('cart/checkout', {
         method: 'POST',
         body: JSON.stringify({
-          items,
-          total,
+          items: cart.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity,
+            unit_price: item.sale_price,
+            subtotal: item.sale_price * item.quantity
+          })),
+          total: cartTotal,
           // Adicione outros campos necessários aqui, como dados do cliente, pagamento, etc.
         })
       });
-
-      // Limpar o carrinho após finalizar a venda
+      alert(`Venda finalizada com sucesso! Número da venda: ${result.sale_number}`);
       setCart([]);
-      
-      // Mostrar mensagem de sucesso
-      alert('Venda finalizada com sucesso!');
-      
-      // Aqui você pode adicionar redirecionamento ou outras ações pós-venda
-      
+      setShowCart(false);
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
-      alert('Ocorreu um erro ao finalizar a venda. Tente novamente.');
+      alert('Erro ao finalizar venda. Verifique o console para mais detalhes.');
     }
+  };
+
+  // Limpar carrinho
+  const clearCart = () => {
+    if (window.confirm('Tem certeza que deseja limpar o carrinho?')) {
+      setCart([]);
+    }
+  };
+
+  // Renderizar botão de limpar carrinho (visível apenas quando houver itens)
+  const renderClearCartButton = () => {
+    if (cart.length === 0) return null;
+    
+    return (
+      <button
+        onClick={clearCart}
+        className="mt-2 w-full bg-red-100 hover:bg-red-200 text-red-700 py-1.5 px-4 rounded-md text-sm font-medium flex items-center justify-center transition-colors"
+      >
+        <X size={16} className="mr-1" />
+        Limpar Venda
+      </button>
+    );
   };
 
   return (
     <div className="container mx-auto p-4 md:p-6">
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Nova Venda</h1>
-        <p className="text-gray-600">Selecione os produtos para adicionar ao carrinho</p>
+      <div className="flex justify-between items-center mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <h1 className="text-2xl font-bold text-gray-800">Nova Venda</h1>
+          <p className="text-gray-600">Selecione os produtos para adicionar ao carrinho</p>
+        </div>
+        
+        {/* Botão do carrinho para desktop */}
+        {!isMobile && (
+          <div className="relative">
+            <button
+              onClick={() => setShowCart(!showCart)}
+              className="bg-white p-3 rounded-full shadow-md hover:shadow-lg transition-shadow relative"
+              aria-label="Ver carrinho"
+            >
+              <ShoppingCart className="text-gray-700" size={24} />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center">
+                  {totalItems}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -188,77 +222,82 @@ const PDVPage = () => {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Área de produtos */}
           <div className={`${showCart && isMobile ? 'hidden' : 'block'} lg:block flex-1`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {products.map(renderProduct)}
             </div>
           </div>
 
           {/* Carrinho de compras */}
-          <div className={`${isMobile ? (showCart ? 'fixed inset-0 bg-white z-50 p-4 overflow-y-auto' : 'hidden') : 'w-full lg:w-96'}`}>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 border-b border-gray-100">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                    <ShoppingCart className="mr-2" size={20} />
-                    Carrinho
-                  </h2>
-                  {isMobile && (
-                    <button 
-                      onClick={() => setShowCart(false)}
-                      className="text-gray-500 hover:text-gray-700 p-1"
-                      aria-label="Fechar carrinho"
-                    >
-                      <X size={20} />
-                    </button>
+          <div 
+            className={`${isMobile 
+              ? (showCart ? 'fixed inset-0 bg-white z-50 p-4 overflow-y-auto' : 'hidden') 
+              : (showCart ? 'w-96' : 'hidden lg:block w-0')} 
+              transition-all duration-300 ease-in-out`}
+          >
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden h-full">
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                  <ShoppingCart className="mr-2" size={20} />
+                  Carrinho
+                  {totalItems > 0 && (
+                    <span className="ml-2 text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                      {totalItems} {totalItems === 1 ? 'item' : 'itens'}
+                    </span>
                   )}
-                </div>
-                {totalItems > 0 && (
-                  <span className="inline-block mt-1 text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                    {totalItems} {totalItems === 1 ? 'item' : 'itens'}
-                  </span>
-                )}
+                </h2>
+                <button 
+                  onClick={() => setShowCart(false)}
+                  className="text-gray-500 hover:text-gray-700 p-1"
+                  aria-label="Fechar carrinho"
+                >
+                  <X size={20} />
+                </button>
               </div>
 
-              {cart.length === 0 ? (
-                <div className="text-center py-8 px-4">
-                  <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                    <ShoppingCart className="text-gray-400" size={24} />
+              <div className="flex flex-col h-[calc(100%-60px)]">
+                {cart.length === 0 ? (
+                  <div className="text-center py-8 px-4 flex-1 flex flex-col items-center justify-center">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                      <ShoppingCart className="text-gray-400" size={24} />
+                    </div>
+                    <h3 className="text-gray-600 font-medium mb-1">Carrinho vazio</h3>
+                    <p className="text-sm text-gray-500">Adicione produtos ao carrinho</p>
                   </div>
-                  <h3 className="text-gray-600 font-medium mb-1">Carrinho vazio</h3>
-                  <p className="text-sm text-gray-500">Adicione produtos ao carrinho</p>
-                </div>
-              ) : (
-                <>
-                  <div className="max-h-96 overflow-y-auto p-4">
-                    {cart.map(renderCartItem)}
-                  </div>
-                  
-                  <div className="border-t border-gray-100 p-4">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-gray-600">Total:</span>
-                      <span className="text-lg font-bold text-gray-900">
-                        {formatCurrency(cartTotal)}
-                      </span>
+                ) : (
+                  <>
+                    <div className="overflow-y-auto flex-1 p-4">
+                      {cart.map(renderCartItem)}
                     </div>
                     
-                    <button
-                      onClick={handleCheckout}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-md font-medium flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={cart.length === 0}
-                    >
-                      <Check className="mr-2" size={18} />
-                      Finalizar Venda
-                    </button>
-                  </div>
-                </>
-              )}
+                    <div className="border-t border-gray-100 p-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-gray-600">Total:</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {formatCurrency(cartTotal)}
+                        </span>
+                      </div>
+                      
+                      <button
+                        onClick={handleCheckout}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-md font-medium flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={cart.length === 0}
+                      >
+                        <Check className="mr-2" size={18} />
+                        Finalizar Venda
+                      </button>
+                      
+                      {renderClearCartButton()}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Botão flutuante do carrinho (somente mobile) */}
-      {isMobile && !showCart && (
+      {isMobile && (
         <div className="fixed bottom-6 right-6 z-40">
           <button
             onClick={() => setShowCart(true)}
