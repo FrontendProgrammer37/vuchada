@@ -88,6 +88,23 @@ const cartService = {
   getItemQuantity(items, productId) {
     const item = items.find(item => item.product_id === productId);
     return item ? item.quantity : 0;
+  },
+
+  // Finalizar compra/checkout
+  async checkout(items, total) {
+    try {
+      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
+        method: 'POST',
+        body: {
+          items,
+          total
+        }
+      });
+      return response;
+    } catch (error) {
+      console.error('Erro ao finalizar compra:', error);
+      throw error;
+    }
   }
 };
 

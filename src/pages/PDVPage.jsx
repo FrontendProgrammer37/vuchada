@@ -122,6 +122,44 @@ const PDVPage = () => {
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  // Função para finalizar a venda
+  const handleCheckout = async () => {
+    try {
+      // Mapear os itens do carrinho para o formato esperado pela API
+      const items = cart.map(item => ({
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.sale_price,
+        subtotal: item.sale_price * item.quantity
+      }));
+
+      // Calcular o total da venda
+      const total = cart.reduce((sum, item) => sum + (item.sale_price * item.quantity), 0);
+
+      // Enviar os dados para a API
+      const response = await apiService.request('cart/checkout', {
+        method: 'POST',
+        body: JSON.stringify({
+          items,
+          total,
+          // Adicione outros campos necessários aqui, como dados do cliente, pagamento, etc.
+        })
+      });
+
+      // Limpar o carrinho após finalizar a venda
+      setCart([]);
+      
+      // Mostrar mensagem de sucesso
+      alert('Venda finalizada com sucesso!');
+      
+      // Aqui você pode adicionar redirecionamento ou outras ações pós-venda
+      
+    } catch (error) {
+      console.error('Erro ao finalizar venda:', error);
+      alert('Ocorreu um erro ao finalizar a venda. Tente novamente.');
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-6">
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
@@ -204,7 +242,8 @@ const PDVPage = () => {
                     </div>
                     
                     <button
-                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-md font-medium flex items-center justify-center transition-colors"
+                      onClick={handleCheckout}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-md font-medium flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={cart.length === 0}
                     >
                       <Check className="mr-2" size={18} />
