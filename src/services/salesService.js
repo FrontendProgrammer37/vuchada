@@ -4,7 +4,10 @@ const salesService = {
   // Criar uma nova venda
   async createSale(saleData) {
     try {
-      const response = await api.post('/sales/', saleData);
+      const response = await api.request('sales/', {
+        method: 'POST',
+        body: saleData
+      });
       return response.data;
     } catch (error) {
       console.error('Erro ao criar venda:', error);
@@ -15,7 +18,7 @@ const salesService = {
   // Obter detalhes de uma venda específica
   async getSale(saleId) {
     try {
-      const response = await api.get(`/sales/${saleId}`);
+      const response = await api.request(`sales/${saleId}`);
       return response.data;
     } catch (error) {
       console.error(`Erro ao buscar venda ${saleId}:`, error);
@@ -30,9 +33,9 @@ const salesService = {
         page,
         limit,
         ...filters
-      });
+      }).toString();
       
-      const response = await api.get(`/sales?${params.toString()}`);
+      const response = await api.request(`sales?${params}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao listar vendas:', error);
@@ -43,7 +46,10 @@ const salesService = {
   // Cancelar uma venda
   async cancelSale(saleId, reason) {
     try {
-      const response = await api.post(`/sales/${saleId}/cancel`, { reason });
+      const response = await api.request(`sales/${saleId}/cancel`, {
+        method: 'POST',
+        body: { reason }
+      });
       return response.data;
     } catch (error) {
       console.error(`Erro ao cancelar venda ${saleId}:`, error);
