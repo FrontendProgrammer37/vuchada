@@ -11,7 +11,7 @@ import Funcionarios from './pages/Funcionarios';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import TodasVendas from './pages/TodasVendas';
-import PDV2 from './pages/PDV2';
+import PDVPage from './pages/PDVPage';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -50,24 +50,82 @@ const AppContent = () => {
           <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
         } 
       />
-      
-      {/* Rotas protegidas */}
-      <Route 
+      <Route
+        path="/dashboard"
         element={
           <ProtectedRoute>
-            <Layout />
+            <Layout>
+              <Dashboard />
+            </Layout>
           </ProtectedRoute>
         }
-      >
-        <Route index element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="produtos" element={<Produtos />} />
-        <Route path="funcionarios" element={<Funcionarios />} />
-        <Route path="vendas" element={<TodasVendas />} />
-        <Route path="relatorios" element={<Relatorios />} />
-        <Route path="configuracoes" element={<Configuracoes />} />
-        <Route path="pdv2" element={<PDV2 />} />
-      </Route>
+      />
+      <Route
+        path="/produtos"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Produtos />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/funcionarios"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Funcionarios />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/relatorios"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Relatorios />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendas"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TodasVendas />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pdv"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <PDVPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/configuracoes"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Configuracoes />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="*"
+        element={
+          <Navigate to="/dashboard" replace />
+        }
+      />
     </Routes>
   );
 };
@@ -76,21 +134,9 @@ const AppContent = () => {
 const App = () => {
   return (
     <AuthProvider>
+      <ToastContainer position="top-right" autoClose={5000} />
       <Router>
-        <div className="min-h-screen bg-gray-100">
-          <AppContent />
-          <ToastContainer
-            position="top-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-          />
-        </div>
+        <AppContent />
       </Router>
     </AuthProvider>
   );

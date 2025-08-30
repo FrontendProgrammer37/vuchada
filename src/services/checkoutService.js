@@ -1,65 +1,30 @@
 import apiService from './api';
 
-const CHECKOUT_ENDPOINT = '/cart'; 
+const CHECKOUT_ENDPOINT = '/api/v1/checkout';
 
 const checkoutService = {
   /**
-   * Adiciona um item ao carrinho
-   * @param {number} productId - ID do produto
-   * @param {number} quantity - Quantidade do produto
-   * @param {string} [sessionId='default'] - ID da sessão do carrinho
-   * @returns {Promise<Object>} Resposta da API
+   * Processa o checkout de um carrinho de compras
+   * @param {Object} checkoutData Dados do checkout
+   * @param {string} checkoutData.payment_method Forma de pagamento (dinheiro, cartao_credito, cartao_debito, pix)
+   * @param {number} [checkoutData.amount_received] Valor recebido (para pagamento em dinheiro)
+   * @param {string} [checkoutData.notes] Observações adicionais
+   * @param {number} [checkoutData.customer_id] ID do cliente (opcional)
+   * @returns {Promise<Object>} Dados da venda processada
    */
-  async addToCart(productId, quantity, sessionId = 'default') {
+  async processCheckout(checkoutData) {
     try {
-      const response = await apiService.request(`${CHECKOUT_ENDPOINT}/add?session_id=${sessionId}`, {
+      const response = await apiService.request(CHECKOUT_ENDPOINT, {
         method: 'POST',
-        body: {
-          product_id: productId,
-          quantity: quantity
-        }
+        body: JSON.stringify({
+          payment_method: checkoutData.payment_method,
+          amount_received: checkoutData.amount_received || 0,
+          notes: checkoutData.notes || '',
+          customer_id: checkoutData.customer_id || null
+        })
       });
       
       return response;
-    } catch (error) {
-      console.error('Erro ao adicionar item ao carrinho:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Obtém os itens do carrinho
-   * @param {string} [sessionId='default'] - ID da sessão do carrinho
-   * @returns {Promise<Object>} Itens do carrinho
-   */
-  async getCart(sessionId = 'default') {
-    try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}?session_id=${sessionId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-    } catch (error) {
-      console.error('Erro ao obter carrinho:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Processa o checkout de um carrinho de compras
-   * @param {Object} checkoutData Dados do checkout
-   * @param {string} checkoutData.payment_method Forma de pagamento (DINHEIRO, MPESA, CARTAO_POS, etc.)
-   * @param {number} [checkoutData.customer_id] ID do cliente (opcional)
-   * @param {string} [checkoutData.notes] Observações adicionais
-   * @param {string} [sessionId='default'] ID da sessão do carrinho
-   * @returns {Promise<Object>} Resposta da API com os dados da venda
-   */
-  async processCheckout(checkoutData, sessionId = 'default') {
-    try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/checkout?session_id=${sessionId}`, {
-        method: 'POST',
-        body: checkoutData
-      });
     } catch (error) {
       console.error('Erro ao processar checkout:', error);
       throw error;
@@ -73,7 +38,7 @@ const checkoutService = {
    */
   async getSaleDetails(saleId) {
     try {
-      return await apiService.request(`/sales/${saleId}`);
+      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales/${saleId}`);
     } catch (error) {
       console.error('Erro ao obter detalhes da venda:', error);
       throw error;
@@ -81,35 +46,85 @@ const checkoutService = {
   },
 
   /**
-   * Remove um item do carrinho
-   * @param {number} productId - ID do produto a ser removido
-   * @param {string} [sessionId='default'] - ID da sessão do carrinho
-   * @returns {Promise<Object>} Resposta da API
+   * Lista as vendas com filtros opcionais
+   * @param {Object} filters Filtros de busca
+   * @param {string} [filters.start_date] Data de início (YYYY-MM-DD)
+   * @param {string} [filters.end_date] Data de fim (YYYY-MM-DD)
+   * @param {string} [filters.payment_method] Forma de pagamento
+   * @param {number} [filters.customer_id] ID do cliente
+   * @param {number} [page=1] Número da página
+   * @param {number} [limit=10] Itens por página
+   * @returns {Promise<Object>} Lista de vendas e metadados de paginação
    */
-  async removeItem(productId, sessionId = 'default') {
+  async listSales(filters = {}, page = 1, limit = 10) {
     try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/items/${productId}?session_id=${sessionId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...filters
       });
+      
+      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales?${params.toString()}`);
     } catch (error) {
-      console.error('Erro ao remover item do carrinho:', error);
+      console.error('Erro ao listar vendas:', error);
       throw error;
     }
   },
 
   /**
-   * Métodos de pagamento disponíveis
+   * Cancela uma venda
+   * @param {number} saleId ID da venda a ser cancelada
+   * @param {string} reason Motivo do cancelamento
+   * @returns {Promise<Object>} Resultado da operação
    */
-  paymentMethods: {
-    CASH: 'DINHEIRO',
-    MPESA: 'MPESA',
-    POS_CARD: 'CARTAO_POS',
-    TRANSFER: 'TRANSFERENCIA',
-    CHECK: 'CHEQUE',
-    MOBILE_MONEY: 'DINHEIRO_MOVEL'
+  async cancelSale(saleId, reason) {
+    try {
+      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales/${saleId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      });
+    } catch (error) {
+      console.error('Erro ao cancelar venda:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gera um link de pagamento (para PIX, boleto, etc.)
+   * @param {Object} paymentData Dados do pagamento
+   * @param {number} paymentData.amount Valor do pagamento
+   * @param {string} paymentData.payment_method Método de pagamento (pix, boleto, etc.)
+   * @param {string} [paymentData.description] Descrição do pagamento
+   * @returns {Promise<Object>} Dados do link de pagamento
+   */
+  async generatePaymentLink(paymentData) {
+    try {
+      return await apiService.request(`${CHECKOUT_ENDPOINT}/payment-link`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: paymentData.amount,
+          payment_method: paymentData.payment_method,
+          description: paymentData.description || ''
+        })
+      });
+    } catch (error) {
+      console.error('Erro ao gerar link de pagamento:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtém o status de um pagamento
+   * @param {string} paymentId ID do pagamento
+   * @returns {Promise<Object>} Status do pagamento
+   */
+  async getPaymentStatus(paymentId) {
+    try {
+      return await apiService.request(`${CHECKOUT_ENDPOINT}/payment/${paymentId}/status`);
+    } catch (error) {
+      console.error('Erro ao obter status do pagamento:', error);
+      throw error;
+    }
   }
 };
 

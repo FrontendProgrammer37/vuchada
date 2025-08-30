@@ -30,25 +30,12 @@ export const CartProvider = ({ children }) => {
 
   // Atualizar estado local do carrinho
   const updateCartState = (cartData) => {
-    // Garantir que os itens tenham as propriedades necessárias
-    const items = (cartData.items || []).map(item => ({
-      ...item,
-      price: parseFloat(item.unit_price || item.price || 0),
-      total_price: parseFloat(item.total_price || (item.unit_price * item.quantity) || 0)
-    }));
-
-    // Calcular totais
-    const subtotal = parseFloat(cartData.subtotal || items.reduce((sum, item) => sum + (parseFloat(item.total_price) || 0), 0));
-    const tax_amount = parseFloat(cartData.tax_amount || 0);
-    const total = parseFloat(cartData.total || (subtotal + tax_amount));
-    const itemCount = items.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0);
-
     setCart({
-      items,
-      subtotal,
-      tax_amount,
-      total,
-      itemCount
+      items: cartData.items || [],
+      subtotal: cartData.subtotal || 0,
+      tax_amount: cartData.tax_amount || 0,
+      total: cartData.total || 0,
+      itemCount: (cartData.items || []).reduce((sum, item) => sum + item.quantity, 0)
     });
   };
 

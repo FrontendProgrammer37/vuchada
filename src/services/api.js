@@ -36,42 +36,34 @@ class ApiService {
     async request(endpoint, options = {}) {
         // Remove a barra inicial se existir para evitar duplicação
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        
-        // Garante que a URL base termine com /api/v1
-        let baseUrl = this.baseURL;
-        if (!baseUrl.endsWith('/api/v1')) {
-            baseUrl = baseUrl.endsWith('/') 
-                ? `${baseUrl}api/v1` 
-                : `${baseUrl}/api/v1`;
-        }
-        
-        // Garante que a URL use HTTPS em produção
-        if (process.env.NODE_ENV === 'production' && baseUrl.startsWith('http://')) {
-            baseUrl = baseUrl.replace('http://', 'https://');
-        }
-        
-        const url = `${baseUrl}/${normalizedEndpoint}`;
+        const url = `${this.baseURL}/${normalizedEndpoint}`;
         
         const config = {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
-            mode: 'cors',
-            credentials: 'include',
+            mode: 'cors', // Força o modo CORS
+            credentials: 'include', // Inclui credenciais se necessário
         };
-
-        // Se o body for um objeto, converte para JSON
-        if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
-            config.body = JSON.stringify(config.body);
-            config.headers = {
-                ...config.headers,
-                'Content-Type': 'application/json'
-            };
-        }
 
         try {
             const response = await fetch(url, config);
             
+            if (!response.ok) {
+                let errorMessage = 'Erro na requisição';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || JSON.stringify(errorData);
+                } catch (e) {
+                    errorMessage = await response.text();
+                }
+                
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.response = response;
+                throw error;
+            }
+
             // Se a resposta for 204 (No Content), retorna null
             if (response.status === 204) {
                 return null;
@@ -79,24 +71,9 @@ class ApiService {
 
             // Tenta fazer o parse da resposta como JSON
             try {
-                const data = await response.clone().json();
-                if (!response.ok) {
-                    const error = new Error(data.detail || 'Erro na requisição');
-                    error.status = response.status;
-                    error.data = data;
-                    throw error;
-                }
-                return data;
-            } catch (jsonError) {
-                // Se não for JSON, tenta ler como texto
-                if (!response.ok) {
-                    const text = await response.clone().text();
-                    const error = new Error(text || 'Erro na requisição');
-                    error.status = response.status;
-                    error.data = text;
-                    throw error;
-                }
-                // Se a resposta for bem sucedida mas não for JSON, retorna o texto
+                return await response.json();
+            } catch (e) {
+                console.warn('Resposta não é um JSON válido:', e);
                 return await response.text();
             }
         } catch (error) {
@@ -104,7 +81,7 @@ class ApiService {
                 url,
                 error: error.message,
                 status: error.status,
-                response: error.response
+                response: error.response ? await error.response.text() : null
             });
             throw error;
         }
@@ -236,27 +213,6 @@ class ApiService {
             throw new Error('A categoria é obrigatória');
         }
 
-        // Check if product with this SKU already exists
-        try {
-            const existingProducts = await this.getProducts({ search: productData.sku });
-            const existingProduct = existingProducts.find(p => p.sku === productData.sku);
-            
-            if (existingProduct) {
-                // If found and active, throw error
-                if (existingProduct.is_active !== false) {
-                    throw new Error('Já existe um produto ativo com este código SKU');
-                }
-                // If found but inactive, update it instead
-                return this.updateProduct(existingProduct.id, {
-                    ...productData,
-                    is_active: true // Reactivate the product
-                });
-            }
-        } catch (error) {
-            console.warn('Erro ao verificar produto existente:', error);
-            // Continue with creation if check fails
-        }
-
         // Convert frontend format to backend format
         const formattedData = {
             codigo: productData.sku.toString().trim(),
@@ -282,10 +238,6 @@ class ApiService {
             return response;
         } catch (error) {
             console.error('Erro ao criar produto:', error);
-            // Improve error message for duplicate SKU
-            if (error.message.includes('Já existe um produto com este código')) {
-                throw new Error('Já existe um produto com este código SKU. Por favor, use um código único.');
-            }
             throw new Error(`Falha ao criar produto: ${error.message}`);
         }
     }
@@ -383,39 +335,6 @@ class ApiService {
         });
     }
 
-    /**
-     * Ativa um produto previamente desativado (soft delete)
-     * @param {number|string} id - ID do produto a ser ativado
-     * @returns {Promise<Object>} Dados do produto ativado
-     */
-    async activateProduct(id) {
-        // Validação do ID
-        if (!id) {
-            throw new Error('ID do produto é obrigatório para ativação');
-        }
-
-        console.log(`Ativando produto com ID: ${id}`);
-
-        try {
-            const response = await this.request(`products/${id}/activate`, {
-                method: 'POST',
-                headers: this.getHeaders()
-            });
-            
-            console.log('Produto ativado com sucesso:', response);
-            return response;
-            
-        } catch (error) {
-            console.error('Erro ao ativar produto:', {
-                id,
-                error: error.message,
-                status: error.status,
-                response: error.response
-            });
-            throw new Error(`Falha ao ativar produto: ${error.message}`);
-        }
-    }
-
     // ===== FUNCIONÁRIOS =====
     
     /**
@@ -484,8 +403,36 @@ class ApiService {
     }
 
     // ===== VENDAS =====
-    // Note: Vendas-related methods are now in salesService.js
-    // to better organize the code and avoid duplication
+    
+    async getSales() {
+        return this.request('sales/');
+    }
+
+    async getSale(id) {
+        return this.request(`sales/${id}`);
+    }
+
+    async createSale(saleData) {
+        // Remover referência ao cliente se existir
+        const { customer_id, ...saleDataSemCliente } = saleData;
+        return this.request('sales/', {
+            method: 'POST',
+            body: JSON.stringify(saleDataSemCliente),
+        });
+    }
+
+    async updateSale(id, saleData) {
+        return this.request(`sales/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(saleData),
+        });
+    }
+
+    async deleteSale(id) {
+        return this.request(`sales/${id}`, {
+            method: 'DELETE',
+        });
+    }
 
     // ===== INVENTÁRIO =====
     
