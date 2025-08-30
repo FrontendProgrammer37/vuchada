@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiService from '../services/api';
 
 const AuthContext = createContext();
@@ -16,52 +16,30 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Carrega o usuário do localStorage na inicialização
-    const loadUserFromStorage = useCallback(() => {
-        try {
-            const userData = apiService.getCurrentUserFromStorage();
-            if (userData) {
-                setUser(userData);
-            }
-        } catch (error) {
-            console.error('Erro ao carregar usuário do localStorage:', error);
-        }
-    }, []);
-
-    // Verifica a autenticação no servidor
-    const checkAuth = useCallback(async () => {
-        try {
-            setLoading(true);
-            const userData = await apiService.getCurrentUser();
-            setUser(userData);
-            setError(null);
-            return userData;
-        } catch (error) {
-            console.error('Erro ao verificar autenticação:', error);
-            if (error.status === 401) {
-                // Token inválido ou expirado
-                apiService.logout();
-                setUser(null);
-            }
-            throw error;
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    // Verifica autenticação ao carregar o componente
+    // Verificar se há token salvo ao carregar a aplicação
     useEffect(() => {
-        loadUserFromStorage();
-        
         const token = localStorage.getItem('token');
         if (token) {
-            checkAuth().catch(() => {
-                // Se houver erro, o estado já foi limpo no checkAuth
-            });
+            checkAuth();
         } else {
             setLoading(false);
         }
-    }, [loadUserFromStorage, checkAuth]);
+    }, []);
+
+    // Verificar autenticação com o token salvo
+    const checkAuth = async () => {
+        try {
+            const userData = await apiService.getCurrentUser();
+            setUser(userData);
+            setError(null);
+        } catch (err) {
+            console.error('Erro ao verificar autenticação:', err);
+            apiService.removeToken();
+            setUser(null);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Login
     const login = async (username, password) => {
@@ -69,82 +47,29 @@ export const AuthProvider = ({ children }) => {
             setLoading(true);
             setError(null);
             
-            // Faz o login e obtém o token
-            const loginResponse = await apiService.login(username, password);
-            
-            // Tenta obter os dados do usuário
-            let userData = loginResponse.user;
-            
-            if (!userData) {
-                userData = await apiService.getCurrentUser();
-            }
-            
-            if (!userData) {
-                throw new Error('Não foi possível carregar os dados do usuário');
-            }
+            const response = await apiService.login(username, password);
+            const userData = await apiService.getCurrentUser();
             
             setUser(userData);
-            return userData;
-            
-        } catch (error) {
-            console.error('Erro no login:', error);
-            
-            // Mensagens de erro mais amigáveis
-            let errorMessage = 'Erro ao fazer login';
-            if (error.message.includes('Failed to fetch')) {
-                errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão com a internet.';
-            } else if (error.status === 401 || error.message.includes('401') || error.message.includes('credenciais')) {
-                errorMessage = 'Usuário ou senha inválidos';
-            } else if (error.message) {
-                errorMessage = error.message;
-            }
-            
-            setError(errorMessage);
-            throw new Error(errorMessage);
+            return { success: true };
+        } catch (err) {
+            setError(err.message || 'Erro no login');
+            return { success: false, error: err.message };
         } finally {
             setLoading(false);
         }
     };
 
     // Logout
-    const logout = async () => {
-        try {
-            // Clear user state first to prevent any UI flicker
-            setUser(null);
-            setError(null);
-            
-            // Call the API logout - this will clear local storage
-            await apiService.logout();
-            
-        } catch (error) {
-            console.error('Erro ao fazer logout:', error);
-            // Even if there's an error, we still want to clear the local state
-            setUser(null);
-            setError(null);
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
-        }
+    const logout = () => {
+        apiService.logout();
+        setUser(null);
+        setError(null);
     };
 
-    // Verifica se o usuário tem uma permissão específica
-    const hasPermission = (permission) => {
-        if (!user) return false;
-        return apiService.hasPermission(permission);
-    };
-
-    // Verifica se o usuário é um funcionário
-    const isEmployee = () => {
-        return user?.role === 'employee';
-    };
-
-    // Verifica se o usuário é um administrador
-    const isAdmin = () => {
-        return user?.role === 'admin';
-    };
-
-    // Verifica se o usuário está autenticado
-    const isAuthenticated = () => {
-        return !!user;
+    // Limpar erro
+    const clearError = () => {
+        setError(null);
     };
 
     const value = {
@@ -153,18 +78,14 @@ export const AuthProvider = ({ children }) => {
         error,
         login,
         logout,
-        checkAuth,
-        hasPermission,
-        isEmployee,
-        isAdmin,
-        isAuthenticated,
+        clearError,
+        isAuthenticated: !!user,
+        isAdmin: user?.role === 'admin' || user?.is_superuser,
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
-};
-
-export default AuthContext;
+}; 

@@ -27,38 +27,16 @@ class ApiService {
     }
 
     // Remover token (logout)
-    async logout() {
-        // Clear local storage and token first
+    removeToken() {
         this.token = null;
         localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        
-        // Don't make the API call since the endpoint doesn't exist
-        // Just resolve immediately
-        return Promise.resolve();
     }
 
     // Função genérica para fazer requisições
     async request(endpoint, options = {}) {
         // Remove a barra inicial se existir para evitar duplicação
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        let url = `${this.baseURL}/${normalizedEndpoint}`;
-        
-        // Handle query parameters
-        if (options.params) {
-            const params = new URLSearchParams();
-            Object.entries(options.params).forEach(([key, value]) => {
-                if (value !== null && value !== undefined) {
-                    params.append(key, value);
-                }
-            });
-            const queryString = params.toString();
-            if (queryString) {
-                url += (url.includes('?') ? '&' : '?') + queryString;
-            }
-            // Remove params from options to avoid sending them in the body
-            delete options.params;
-        }
+        const url = `${this.baseURL}/${normalizedEndpoint}`;
         
         const config = {
             method: 'GET',
@@ -123,130 +101,25 @@ class ApiService {
         formData.append('username', username);
         formData.append('password', password);
 
-        try {
-            const response = await fetch(`${this.baseURL}/auth/login`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'application/json',
-                },
-                body: formData.toString(),
-            });
+        // O endpoint de login espera 'x-www-form-urlencoded', então não usamos o header padrão
+        const data = await this.request('auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString(),
+        });
 
-            const data = await response.json();
-            
-            if (!response.ok) {
-                // Se o servidor retornar um erro 401, lança uma mensagem mais amigável
-                if (response.status === 401) {
-                    throw new Error('Usuário ou senha inválidos');
-                }
-                throw new Error(data.detail || 'Falha no login. Por favor, tente novamente.');
-            }
+        this.setToken(data.access_token);
+        return data;
+    }
 
-            if (!data.access_token) {
-                throw new Error('Token de acesso não recebido do servidor');
-            }
-
-            this.setToken(data.access_token);
-            
-            // Tenta obter os dados do usuário se não estiverem na resposta
-            if (!data.user) {
-                try {
-                    const userData = await this.getCurrentUser();
-                    data.user = userData;
-                    localStorage.setItem('user', JSON.stringify(userData));
-                } catch (userError) {
-                    console.warn('Não foi possível obter os dados do usuário:', userError);
-                }
-            } else {
-                localStorage.setItem('user', JSON.stringify(data.user));
-            }
-            
-            return data;
-        } catch (error) {
-            console.error('Erro no login:', error);
-            // Melhora a mensagem de erro para o usuário
-            if (error.message.includes('Failed to fetch')) {
-                throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet.');
-            }
-            throw error;
-        }
+    async logout() {
+        this.removeToken();
     }
 
     async getCurrentUser() {
-        try {
-            const response = await this.request('auth/me');
-            
-            // Se a resposta contiver os dados do usuário, retorna
-            if (response && (response.id || response.user_id)) {
-                // Garante que o objeto de usuário tenha um formato consistente
-                const userData = {
-                    id: response.id || response.user_id,
-                    username: response.username,
-                    email: response.email,
-                    full_name: response.full_name || response.username,
-                    role: response.role || 'user',
-                    is_admin: response.is_admin || response.role === 'admin',
-                    permissions: response.permissions || []
-                };
-                
-                // Atualiza o usuário no localStorage
-                localStorage.setItem('user', JSON.stringify(userData));
-                
-                return userData;
-            }
-            
-            throw new Error('Dados do usuário inválidos');
-        } catch (error) {
-            console.error('Erro ao obter dados do usuário:', error);
-            // Limpa o token se não for mais válido
-            if (error.status === 401) {
-                this.removeToken();
-                localStorage.removeItem('user');
-                // Não lança o erro para não quebrar o fluxo de login
-                return null;
-            }
-            throw error;
-        }
-    }
-
-    // Funções de verificação de permissões
-    hasPermission(permission) {
-        const user = this.getCurrentUserFromStorage();
-        if (!user) return false;
-        
-        // Se for admin, tem todas as permissões
-        if (user.role === 'admin') return true;
-        
-        // Se for funcionário, verifica as permissões específicas
-        if (user.role === 'employee' && user.permissions) {
-            return user.permissions[permission] === true;
-        }
-        
-        return false;
-    }
-
-    // Verifica se o usuário atual é um funcionário
-    isEmployee() {
-        const user = this.getCurrentUserFromStorage();
-        return user?.role === 'employee';
-    }
-
-    // Verifica se o usuário atual é um administrador
-    isAdmin() {
-        const user = this.getCurrentUserFromStorage();
-        return user?.role === 'admin';
-    }
-
-    // Obtém o usuário atual do localStorage
-    getCurrentUserFromStorage() {
-        try {
-            const userStr = localStorage.getItem('user');
-            return userStr ? JSON.parse(userStr) : null;
-        } catch (error) {
-            console.error('Erro ao obter usuário do localStorage:', error);
-            return null;
-        }
+        return this.request('auth/me');
     }
 
     // ===== CATEGORIAS =====
