@@ -53,13 +53,13 @@ const AppContent = () => {
       
       {/* Rotas protegidas */}
       <Route 
-        path="/" 
         element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
         }
       >
+        <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="produtos" element={<Produtos />} />
         <Route path="funcionarios" element={<Funcionarios />} />
