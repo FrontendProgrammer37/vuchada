@@ -21,6 +21,21 @@ const formatWeight = (weight) => {
   }).format(weight);
 };
 
+// Payment methods constant
+const PAYMENT_METHODS = [
+  { value: 'DINHEIRO', label: 'Dinheiro' },
+  { value: 'MPESA', label: 'M-Pesa' },
+  { value: 'EMOLA', label: 'E-Mola' },
+  { value: 'CARTAO_POS', label: 'Cartão POS' },
+  { value: 'TRANSFERENCIA', label: 'Transferência Bancária' },
+  { value: 'MILLENNIUM', label: 'Millennium BIM' },
+  { value: 'BCI', label: 'BCI' },
+  { value: 'STANDARD_BANK', label: 'Standard Bank' },
+  { value: 'ABSA_BANK', label: 'ABSA Bank' },
+  { value: 'LETSHEGO', label: 'Letshego' },
+  { value: 'MYBUCKS', label: 'MyBucks' }
+];
+
 const PDVPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -364,52 +379,80 @@ const PDVPage = () => {
                     </div>
                     
                     <div className="border-t border-gray-100 p-4">
-                      <div className="flex justify-between items-center mb-4">
-                        <span className="text-gray-600">Total:</span>
-                        <span className="text-lg font-bold text-gray-900">
-                          {formatCurrency(cartTotal)}
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center mb-4">
-                        <span className="text-gray-600">Método de pagamento:</span>
-                        <select
-                          value={paymentMethod}
-                          onChange={(e) => setPaymentMethod(e.target.value)}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                      <div className="mt-4 border-t border-gray-200 pt-4">
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Forma de Pagamento
+                          </label>
+                          <select
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                          >
+                            {PAYMENT_METHODS.map((method) => (
+                              <option key={method.value} value={method.value}>
+                                {method.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {paymentMethod === 'DINHEIRO' && (
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Valor Recebido
+                            </label>
+                            <input
+                              type="number"
+                              value={amountReceived}
+                              onChange={(e) => setAmountReceived(e.target.value)}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                              placeholder="0.00"
+                              min="0"
+                              step="0.01"
+                            />
+                            {parseFloat(amountReceived || 0) < cartTotal && paymentMethod === 'DINHEIRO' && (
+                              <p className="mt-1 text-sm text-red-600">
+                                Valor insuficiente
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-medium">Total:</span>
+                          <span className="font-bold">{formatCurrency(cartTotal)}</span>
+                        </div>
+                        
+                        {paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) > 0 && (
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium">Troco:</span>
+                            <span className="font-bold">
+                              {formatCurrency(parseFloat(amountReceived || 0) - cartTotal)}
+                            </span>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={handleCheckout}
+                          disabled={
+                            cart.length === 0 || 
+                            (paymentMethod === 'DINHEIRO' && 
+                             (isNaN(parseFloat(amountReceived)) || 
+                              parseFloat(amountReceived) < cartTotal))
+                          }
+                          className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                            cart.length === 0 || 
+                            (paymentMethod === 'DINHEIRO' && 
+                             (isNaN(parseFloat(amountReceived)) || 
+                              parseFloat(amountReceived) < cartTotal))
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
-                          <option value="DINHEIRO">Dinheiro</option>
-                          <option value="CARTÃO">Cartão</option>
-                        </select>
+                          Finalizar Venda
+                        </button>
                       </div>
-                      
-                      <div className="flex justify-between items-center mb-4">
-                        <span className="text-gray-600">Valor recebido:</span>
-                        <input
-                          type="number"
-                          value={amountReceived}
-                          onChange={(e) => setAmountReceived(e.target.value)}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                        />
-                      </div>
-                      
-                      <div className="flex justify-between items-center mb-4">
-                        <span className="text-gray-600">Troco:</span>
-                        <span className="text-lg font-bold text-gray-900">
-                          {formatCurrency(change)}
-                        </span>
-                      </div>
-                      
-                      <button
-                        onClick={handleCheckout}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-md font-medium flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={cart.length === 0}
-                      >
-                        <Check className="mr-2" size={18} />
-                        Finalizar Venda
-                      </button>
-                      
-                      {renderClearCartButton()}
                     </div>
                   </>
                 )}
