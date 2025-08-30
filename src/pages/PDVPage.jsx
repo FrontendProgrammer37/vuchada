@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, X, Check, ShoppingCart } from 'lucide-react';
+import { Plus, Minus, X, Check, ShoppingCart, Scale } from 'lucide-react';
 import apiService from '../services/api';
 import cartService from '../services/cartService';
 import checkoutService from '../services/checkoutService';
 import { toast } from 'react-toastify';
+import WeightSaleModal from '../components/WeightSaleModal';
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
@@ -23,6 +24,7 @@ const PDVPage = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [showCart, setShowCart] = useState(!isMobile);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [selectedProductForWeight, setSelectedProductForWeight] = useState(null);
 
   // Buscar produtos e carrinho ao carregar a página
   useEffect(() => {
@@ -79,29 +81,67 @@ const PDVPage = () => {
   };
 
   // Adicionar item ao carrinho
-  const addToCart = async (product) => {
+  const addToCart = async (product, options = {}) => {
     try {
-      await cartService.addItem(product.id, 1);
-      await loadCart(); // Recarrega o carrinho após adicionar item
+      await cartService.addItem(
+        product.id, 
+        1, 
+        options,
+        'default'
+      );
+      await loadCart();
       toast.success(`${product.name} adicionado ao carrinho`);
     } catch (error) {
       console.error('Erro ao adicionar item:', error);
-      toast.error('Erro ao adicionar item ao carrinho');
+      toast.error(error.message || 'Erro ao adicionar item ao carrinho');
+    }
+  };
+
+  // Abrir modal de venda por peso
+  const handleSellByWeight = (product) => {
+    setSelectedProductForWeight(product);
+  };
+
+  // Confirmar venda por peso
+  const handleConfirmWeightSale = async (saleData) => {
+    try {
+      await addToCart(selectedProductForWeight, {
+        isWeightSale: true,
+        weightInKg: saleData.weightInKg,
+        customPrice: saleData.customPrice
+      });
+      setSelectedProductForWeight(null);
+    } catch (error) {
+      console.error('Erro ao adicionar item por peso:', error);
     }
   };
 
   // Atualizar quantidade de um item no carrinho
   const updateCartItem = async (productId, newQuantity) => {
     try {
-      if (newQuantity < 1) {
-        await cartService.removeItem(productId);
-      } else {
-        await cartService.updateItemQuantity(productId, newQuantity);
+      const product = products.find(p => p.id === productId);
+      const cartItem = cart.items.find(item => item.product_id === productId);
+
+      if (!product || !cartItem) return;
+
+      // Se for um produto por peso, não permitir aumentar a quantidade
+      if (cartItem.is_weight_sale) {
+        toast.info('Para alterar a quantidade de um produto vendido por peso, remova e adicione novamente com o peso desejado');
+        return;
       }
+
+      // Se for um produto normal, adicionar mais uma unidade
+      if (newQuantity > 0) {
+        await cartService.addItem(productId, 1);
+      } else {
+        // Se a nova quantidade for zero ou negativa, remover o item
+        await cartService.removeItem(productId);
+      }
+      
       await loadCart();
     } catch (error) {
       console.error('Erro ao atualizar carrinho:', error);
-      toast.error('Erro ao atualizar carrinho');
+      toast.error(error.message || 'Erro ao atualizar carrinho');
     }
   };
 
@@ -169,8 +209,6 @@ const PDVPage = () => {
   const renderCartItem = (item) => {
     const unitPrice = parseFloat(item.unit_price || item.price || 0);
     const totalPrice = parseFloat(item.total_price || (unitPrice * item.quantity) || 0);
-    
-    // Tenta encontrar o produto completo na lista de produtos para obter o nome
     const product = products.find(p => p.id === (item.product_id || item.id));
     const productName = product?.name || item.product?.name || item.name || item.product_name || 'Produto sem nome';
     
@@ -178,9 +216,15 @@ const PDVPage = () => {
       <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100">
         <div className="flex-1">
           <div className="font-medium text-gray-800">{productName}</div>
-          <div className="text-sm text-gray-500">
-            {`${item.quantity} × ${unitPrice.toFixed(2)} MTn`}
-          </div>
+          {item.is_weight_sale ? (
+            <div className="text-sm text-gray-500">
+              {item.weight_in_kg} kg × {unitPrice.toFixed(2)} MTn/kg
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">
+              {item.quantity} × {unitPrice.toFixed(2)} MTn
+            </div>
+          )}
         </div>
         <div className="font-medium text-gray-900">
           {totalPrice.toFixed(2)} MTn
@@ -220,16 +264,34 @@ const PDVPage = () => {
       <p className="text-gray-600 text-sm mb-2">{product.description || 'Sem descrição'}</p>
       <div className="flex justify-between items-center mt-2">
         <span className="font-bold text-blue-600">{formatCurrency(product.sale_price)}</span>
-        <button
-          onClick={() => addToCart(product)}
-          className="bg-blue-600 text-white p-1 rounded hover:bg-blue-700 transition-colors"
-          aria-label="Adicionar ao carrinho"
-        >
-          <Plus size={16} />
-        </button>
+        {renderAddToCartButton(product)}
       </div>
     </div>
   );
+
+  // Renderizar botão de adicionar ao carrinho
+  const renderAddToCartButton = (product) => {
+    if (product.venda_por_peso) {
+      return (
+        <button
+          onClick={() => handleSellByWeight(product)}
+          className="mt-2 w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 flex items-center justify-center"
+        >
+          <Scale className="mr-2" size={16} />
+          Vender por Peso
+        </button>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => addToCart(product)}
+        className="mt-2 w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+      >
+        Adicionar ao Carrinho
+      </button>
+    );
+  };
 
   // Calcular total do carrinho
   const cartTotal = cart.total;
@@ -394,6 +456,14 @@ const PDVPage = () => {
           </button>
         </div>
       )}
+      
+      {/* Modal de venda por peso */}
+      <WeightSaleModal
+        product={selectedProductForWeight}
+        isOpen={!!selectedProductForWeight}
+        onClose={() => setSelectedProductForWeight(null)}
+        onConfirm={handleConfirmWeightSale}
+      />
     </div>
   );
 };

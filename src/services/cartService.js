@@ -7,17 +7,32 @@ const cartService = {
    * Adiciona um item ao carrinho
    * @param {number} productId - ID do produto
    * @param {number} [quantity=1] - Quantidade do produto
+   * @param {Object} [options] - Opções adicionais
+   * @param {boolean} [options.isWeightSale=false] - Se é uma venda por peso
+   * @param {number} [options.weightInKg] - Peso em kg (obrigatório se isWeightSale=true)
+   * @param {number} [options.customPrice] - Preço personalizado (obrigatório se isWeightSale=true)
    * @param {string} [sessionId='default'] - ID da sessão do carrinho
    * @returns {Promise<Object>} Resposta da API
    */
-  async addItem(productId, quantity = 1, sessionId = 'default') {
+  async addItem(productId, quantity = 1, { isWeightSale = false, weightInKg, customPrice } = {}, sessionId = 'default') {
     try {
+      const body = {
+        product_id: productId,
+        quantity: quantity
+      };
+
+      if (isWeightSale) {
+        if (weightInKg === undefined || customPrice === undefined) {
+          throw new Error('Para produtos vendidos por peso, é necessário informar o peso e o preço personalizado');
+        }
+        body.is_weight_sale = true;
+        body.weight_in_kg = weightInKg;
+        body.custom_price = customPrice;
+      }
+
       const response = await apiService.request(`${CART_BASE_URL}/add?session_id=${sessionId}`, {
         method: 'POST',
-        body: {
-          product_id: productId,
-          quantity: quantity
-        }
+        body: body
       });
       return response;
     } catch (error) {
@@ -53,8 +68,11 @@ const cartService = {
   async removeItem(productId, sessionId = 'default') {
     try {
       const response = await apiService.request(
-        `${CART_BASE_URL}/cart/items/${productId}?session_id=${sessionId}`,
-        { method: 'DELETE' }
+        `${CART_BASE_URL}/remove?session_id=${sessionId}`,
+        {
+          method: 'POST',
+          body: { product_id: productId }
+        }
       );
       return response;
     } catch (error) {
@@ -70,40 +88,14 @@ const cartService = {
    */
   async clearCart(sessionId = 'default') {
     try {
-      // First, get the current cart to get all items
-      const cart = await this.getCart(sessionId);
-      
-      // If cart is already empty, return early
-      if (!cart.items || cart.items.length === 0) {
-        return { success: true, message: 'O carrinho já está vazio' };
-      }
-
-      // Remove each item individually
-      const removePromises = cart.items.map(item => 
-        this.removeItem(item.product_id || item.id, sessionId)
-          .then(() => ({ success: true }))
-          .catch(error => {
-            console.error(`Erro ao remover item ${item.product_id || item.id}:`, error);
-            return { success: false, error };
-          })
+      const response = await apiService.request(
+        `${CART_BASE_URL}/clear?session_id=${sessionId}`,
+        { method: 'POST' }
       );
-
-      const results = await Promise.all(removePromises);
-      const failedRemovals = results.filter(result => !result.success);
-      
-      if (failedRemovals.length > 0) {
-        console.error('Alguns itens não puderam ser removidos:', failedRemovals);
-        throw new Error(`Não foi possível remover ${failedRemovals.length} itens do carrinho`);
-      }
-      
-      return { 
-        success: true, 
-        message: 'Carrinho limpo com sucesso',
-        itemsRemoved: cart.items.length
-      };
+      return response;
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
-      throw new Error(`Erro ao limpar carrinho: ${error.message}`);
+      throw new Error(error.message || 'Erro ao limpar carrinho');
     }
   },
 
