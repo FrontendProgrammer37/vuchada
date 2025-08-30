@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CART_ENDPOINT = '/api/v1/cart';
+const CART_ENDPOINT = '/cart'; // Removido o '/api/v1' pois já está incluso no baseURL
 
 const cartService = {
   /**
@@ -14,10 +14,10 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/add?session_id=${sessionId}`, {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           product_id: productId,
           quantity: quantity
-        }
+        })
       });
       return response;
     } catch (error) {
@@ -56,10 +56,10 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/update?session_id=${sessionId}`, {
         method: 'PUT',
-        body: {
+        body: JSON.stringify({
           product_id: productId,
           quantity: quantity
-        }
+        })
       });
       return response;
     } catch (error) {
@@ -78,9 +78,9 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/remove?session_id=${sessionId}`, {
         method: 'DELETE',
-        body: {
+        body: JSON.stringify({
           product_id: productId
-        }
+        })
       });
       return response;
     } catch (error) {
