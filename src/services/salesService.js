@@ -1,88 +1,123 @@
 import api from './api';
 
-const salesService = {
-  // Get sales with pagination
-  async getSales(page = 1, limit = 10) {
-    try {
-      const skip = (page - 1) * limit;
-      const response = await api.get(`/sales?skip=${skip}&limit=${limit}`);
-      
-      // Transform the API response to match the expected format
-      return {
-        items: Array.isArray(response) ? response : [],
-        page: page,
-        total_items: response?.length || 0,
-        total_pages: Math.ceil((response?.length || 0) / limit)
-      };
-    } catch (error) {
-      console.error('Erro ao buscar vendas:', error);
-      return { items: [], page: 1, total_items: 0, total_pages: 1 };
-    }
-  },
+// Get sales with pagination and filters
+export const getSales = async (params = {}) => {
+  try {
+    const { page = 0, limit = 10, status, start_date, end_date, search } = params;
+    const skip = page * limit;
+    
+    // Build query parameters
+    const queryParams = new URLSearchParams({
+      skip,
+      limit,
+      ...(status && { status }),
+      ...(start_date && { start_date }),
+      ...(end_date && { end_date }),
+      ...(search && { search })
+    });
 
-  // Get sale details
-  async getSale(saleId) {
-    try {
-      const response = await api.get(`/sales/${saleId}`);
-      return response;
-    } catch (error) {
-      console.error('Erro ao buscar detalhes da venda:', error);
-      throw error;
-    }
-  },
-
-  // Create a new sale
-  async createSale(saleData) {
-    try {
-      const response = await api.post('/sales/', saleData);
-      return response;
-    } catch (error) {
-      console.error('Erro ao criar venda:', error);
-      throw error;
-    }
-  },
-
-  // Cancel a sale
-  async cancelSale(saleId, reason) {
-    try {
-      const response = await api.patch(`/sales/${saleId}/cancel`, { reason });
-      return response;
-    } catch (error) {
-      console.error('Erro ao cancelar venda:', error);
-      throw error;
-    }
-  },
-
-  // Get available payment methods
-  async getPaymentMethods() {
-    return [
-      'DINHEIRO',
-      'MPESA',
-      'EMOLA',
-      'CARTAO_POS',
-      'TRANSFERENCIA',
-      'MILLENNIUM',
-      'BCI',
-      'STANDARD_BANK',
-      'ABSA_BANK',
-      'LETSHEGO',
-      'MYBUCKS'
-    ];
-  },
-
-  // Export sales to CSV
-  async exportSalesToCSV(params = {}) {
-    try {
-      const response = await api.get('/sales/export/csv', {
-        params,
-        responseType: 'blob'
-      });
-      return response;
-    } catch (error) {
-      console.error('Erro ao exportar vendas para CSV:', error);
-      throw error;
-    }
+    const response = await api.get(`/sales?${queryParams}`);
+    
+    return {
+      items: Array.isArray(response.data) ? response.data : [],
+      total: response.data?.length || 0,
+      page: page,
+      limit: limit
+    };
+  } catch (error) {
+    console.error('Erro ao buscar vendas:', error);
+    throw error;
   }
 };
 
-export default salesService;
+// Get sale details
+export const getSale = async (saleId) => {
+  try {
+    const response = await api.get(`/sales/${saleId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao buscar detalhes da venda:', error);
+    throw error;
+  }
+};
+
+// Create a new sale
+export const createSale = async (saleData) => {
+  try {
+    const response = await api.post('/sales/', saleData);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao criar venda:', error);
+    throw error;
+  }
+};
+
+// Cancel a sale
+export const cancelSale = async (saleId, reason) => {
+  try {
+    const response = await api.put(`/sales/${saleId}/cancel`, { reason });
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao cancelar venda:', error);
+    throw error;
+  }
+};
+
+// Update sale status
+export const updateSaleStatus = async (saleId, status) => {
+  try {
+    const response = await api.put(`/sales/${saleId}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao atualizar status da venda:', error);
+    throw error;
+  }
+};
+
+// Get sales statistics
+export const getSalesStats = async (params = {}) => {
+  try {
+    const { start_date, end_date } = params;
+    const queryParams = new URLSearchParams();
+    
+    if (start_date) queryParams.append('start_date', start_date);
+    if (end_date) queryParams.append('end_date', end_date);
+    
+    const response = await api.get(`/sales/stats?${queryParams}`);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas de vendas:', error);
+    throw error;
+  }
+};
+
+// Get available payment methods
+export const getPaymentMethods = async () => {
+  return [
+    'DINHEIRO',
+    'MPESA',
+    'EMOLA',
+    'CARTAO_POS',
+    'TRANSFERENCIA',
+    'MILLENNIUM',
+    'BCI',
+    'STANDARD_BANK',
+    'ABSA_BANK',
+    'LETSHEGO',
+    'MYBUCKS'
+  ];
+};
+
+// Export sales to CSV
+export const exportSalesToCSV = async (params = {}) => {
+  try {
+    const response = await api.get('/sales/export/csv', {
+      params,
+      responseType: 'blob'
+    });
+    return response;
+  } catch (error) {
+    console.error('Erro ao exportar vendas para CSV:', error);
+    throw error;
+  }
+};
