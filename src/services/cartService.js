@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CART_ENDPOINT = '/cart'; // Removido o '/api/v1' pois já está incluso no baseURL
+const CART_BASE_URL = '/cart';
 
 const cartService = {
   /**
@@ -12,7 +12,7 @@ const cartService = {
    */
   async addItem(productId, quantity = 1, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/items?session_id=${sessionId}`, {
+      const response = await apiService.request(`${CART_BASE_URL}/add?session_id=${sessionId}`, {
         method: 'POST',
         body: {
           product_id: productId,
@@ -33,7 +33,7 @@ const cartService = {
    */
   async getCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}?session_id=${sessionId}`);
+      const response = await apiService.request(`${CART_BASE_URL}?session_id=${sessionId}`);
       return response;
     } catch (error) {
       if (error.status === 404) {
@@ -41,6 +41,43 @@ const cartService = {
       }
       console.error('Erro ao buscar carrinho:', error);
       throw new Error(error.message || 'Erro ao buscar carrinho');
+    }
+  },
+
+  /**
+   * Remove um item do carrinho
+   * @param {number} productId - ID do produto a ser removido
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async removeItem(productId, sessionId = 'default') {
+    try {
+      const response = await apiService.request(
+        `${CART_BASE_URL}/cart/items/${productId}?session_id=${sessionId}`,
+        { method: 'DELETE' }
+      );
+      return response;
+    } catch (error) {
+      console.error('Erro ao remover item do carrinho:', error);
+      throw new Error(error.message || 'Erro ao remover item do carrinho');
+    }
+  },
+
+  /**
+   * Limpa todos os itens do carrinho
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async clearCart(sessionId = 'default') {
+    try {
+      const response = await apiService.request(
+        `${CART_BASE_URL}/cart?session_id=${sessionId}`,
+        { method: 'DELETE' }
+      );
+      return response;
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      throw new Error(error.message || 'Erro ao limpar carrinho');
     }
   },
 
@@ -54,7 +91,7 @@ const cartService = {
   async updateItemQuantity(productId, quantity, sessionId = 'default') {
     try {
       const response = await apiService.request(
-        `${CART_ENDPOINT}/items/${productId}?session_id=${sessionId}`,
+        `${CART_BASE_URL}/cart/items/${productId}?session_id=${sessionId}`,
         {
           method: 'PUT',
           body: { quantity }
@@ -64,47 +101,6 @@ const cartService = {
     } catch (error) {
       console.error('Erro ao atualizar quantidade do item:', error);
       throw new Error(error.message || 'Erro ao atualizar quantidade do item');
-    }
-  },
-
-  /**
-   * Remove um item do carrinho
-   * @param {number} productId - ID do produto a ser removido
-   * @param {string} [sessionId='default'] - ID da sessão do carrinho
-   * @returns {Promise<Object>} Resposta da API
-   */
-  async removeItem(productId, sessionId = 'default') {
-    try {
-      const response = await apiService.request(
-        `${CART_ENDPOINT}/items/${productId}?session_id=${sessionId}`,
-        { method: 'DELETE' }
-      );
-      return response;
-    } catch (error) {
-      console.error('Erro ao remover item do carrinho:', error);
-      throw new Error(error.message || 'Erro ao remover item do carrinho');
-    }
-  },
-
-  /**
-   * Limpa todos os itens do carrinho
-   * @param {string} [sessionId='default'] - ID da sessão do carrinho
-   * @returns {Promise<{success: boolean, message: string}>} Resultado da operação
-   */
-  async clearCart(sessionId = 'default') {
-    try {
-      const response = await apiService.request(
-        `${CART_ENDPOINT}?session_id=${sessionId}`,
-        { method: 'DELETE' }
-      );
-      return {
-        success: true,
-        message: 'Carrinho limpo com sucesso',
-        data: response
-      };
-    } catch (error) {
-      console.error('Erro ao limpar carrinho:', error);
-      throw new Error(error.message || 'Erro ao limpar carrinho');
     }
   },
 
