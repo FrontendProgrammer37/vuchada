@@ -70,14 +70,40 @@ const cartService = {
    */
   async clearCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(
-        `${CART_BASE_URL}/cart?session_id=${sessionId}`,
-        { method: 'DELETE' }
+      // First, get the current cart to get all items
+      const cart = await this.getCart(sessionId);
+      
+      // If cart is already empty, return early
+      if (!cart.items || cart.items.length === 0) {
+        return { success: true, message: 'O carrinho já está vazio' };
+      }
+
+      // Remove each item individually
+      const removePromises = cart.items.map(item => 
+        this.removeItem(item.product_id || item.id, sessionId)
+          .then(() => ({ success: true }))
+          .catch(error => {
+            console.error(`Erro ao remover item ${item.product_id || item.id}:`, error);
+            return { success: false, error };
+          })
       );
-      return response;
+
+      const results = await Promise.all(removePromises);
+      const failedRemovals = results.filter(result => !result.success);
+      
+      if (failedRemovals.length > 0) {
+        console.error('Alguns itens não puderam ser removidos:', failedRemovals);
+        throw new Error(`Não foi possível remover ${failedRemovals.length} itens do carrinho`);
+      }
+      
+      return { 
+        success: true, 
+        message: 'Carrinho limpo com sucesso',
+        itemsRemoved: cart.items.length
+      };
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
-      throw new Error(error.message || 'Erro ao limpar carrinho');
+      throw new Error(`Erro ao limpar carrinho: ${error.message}`);
     }
   },
 
