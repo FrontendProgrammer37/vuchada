@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CART_ENDPOINT = '/api/v1/cart';
+const CART_ENDPOINT = '/cart';  // Removido /api/v1 pois já está na baseURL
 
 const cartService = {
   // Adicionar item ao carrinho
@@ -97,7 +97,7 @@ const cartService = {
         throw new Error('Método de pagamento é obrigatório');
       }
 
-      const response = await apiService.request('cart/checkout', {
+      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
         method: 'POST',
         body: {
           payment_method: paymentMethod.toUpperCase(), // Ensure uppercase as required by the API
