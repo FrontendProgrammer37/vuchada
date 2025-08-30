@@ -26,25 +26,40 @@ const PDVPage = () => {
 
   // Buscar produtos e carrinho ao carregar a página
   useEffect(() => {
-    const fetchData = async () => {
+    const initializePDV = async () => {
       try {
         setLoading(true);
-        // Buscar produtos
+        
+        // 1. Limpar o carrinho existente
+        try {
+          await cartService.clearCart();
+        } catch (error) {
+          console.warn('Não foi possível limpar o carrinho:', error);
+          // Continua mesmo se não conseguir limpar
+        }
+        
+        // 2. Buscar produtos
         const productsData = await apiService.getProducts({ limit: 1000 });
         setProducts(productsData);
         
-        // Buscar carrinho atual
-        await loadCart();
+        // 3. Inicializar carrinho vazio
+        setCart({
+          items: [],
+          subtotal: 0,
+          total: 0,
+          itemCount: 0
+        });
+        
       } catch (err) {
-        console.error('Erro ao carregar dados:', err);
+        console.error('Erro ao inicializar PDV:', err);
         setError('Erro ao carregar dados. Tente novamente mais tarde.');
-        toast.error('Erro ao carregar dados do sistema');
+        toast.error('Erro ao carregar o PDV');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    initializePDV();
   }, []);
 
   // Carregar carrinho do servidor
@@ -155,10 +170,14 @@ const PDVPage = () => {
     const unitPrice = parseFloat(item.unit_price || item.price || 0);
     const totalPrice = parseFloat(item.total_price || (unitPrice * item.quantity) || 0);
     
+    // Tenta encontrar o produto completo na lista de produtos para obter o nome
+    const product = products.find(p => p.id === (item.product_id || item.id));
+    const productName = product?.name || item.product?.name || item.name || item.product_name || 'Produto sem nome';
+    
     return (
       <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100">
         <div className="flex-1">
-          <div className="font-medium text-gray-800">{item.name || item.product_name || 'Produto sem nome'}</div>
+          <div className="font-medium text-gray-800">{productName}</div>
           <div className="text-sm text-gray-500">
             {`${item.quantity} × ${unitPrice.toFixed(2)} MTn`}
           </div>
