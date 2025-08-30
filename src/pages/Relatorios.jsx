@@ -13,7 +13,6 @@ import {
   Package,
   X
 } from 'lucide-react';
-import salesService from '../services/salesService';
 import apiService from '../services/api';
 
 const Relatorios = () => {
@@ -81,12 +80,12 @@ const Relatorios = () => {
       setLoading(true);
       setError(null);
       const [sales, products, categories] = await Promise.all([
-        salesService.getSales({ limit: 1000 }), // Get more items for reporting
+        apiService.getSales(),
         apiService.getProducts(),
         apiService.getCategories()
       ]);
 
-      const salesFiltered = sales.items.filter(s => s.created_at && isWithinRange(new Date(s.created_at)));
+      const salesFiltered = sales.filter(s => s.created_at && isWithinRange(new Date(s.created_at)));
       const vendasTotal = salesFiltered.length;
       const receitaTotal = salesFiltered.reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
       const produtosVendidos = salesFiltered.reduce((acc, _s) => acc + 1, 0); // sem itens, usamos o número de vendas como aproximação

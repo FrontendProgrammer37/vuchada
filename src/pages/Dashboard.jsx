@@ -11,7 +11,6 @@ import {
   Archive,
   TrendingUp as Profit
 } from 'lucide-react';
-import salesService from '../services/salesService';
 import apiService from '../services/api';
 
 const Dashboard = () => {
@@ -40,9 +39,8 @@ const Dashboard = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      
       const [sales, products] = await Promise.all([
-        salesService.getSales({ limit: 100 }), // Get recent sales
+        apiService.getSales(),
         apiService.getProducts()
       ]);
 
@@ -54,11 +52,11 @@ const Dashboard = () => {
       const isSameDay = (d) => d.toISOString().slice(0,10) === todayKey;
       const isSameMonth = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` === monthKey;
 
-      const vendasHoje = sales.items.filter(s => s.created_at && isSameDay(parseDate(s.created_at))).length;
-      const vendasMes = sales.items.filter(s => s.created_at && isSameMonth(parseDate(s.created_at))).length;
-      const receitaHoje = sales.items.filter(s => s.created_at && isSameDay(parseDate(s.created_at)))
+      const vendasHoje = sales.filter(s => s.created_at && isSameDay(parseDate(s.created_at))).length;
+      const vendasMes = sales.filter(s => s.created_at && isSameMonth(parseDate(s.created_at))).length;
+      const receitaHoje = sales.filter(s => s.created_at && isSameDay(parseDate(s.created_at)))
                              .reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
-      const receitaMes = sales.items.filter(s => s.created_at && isSameMonth(parseDate(s.created_at)))
+      const receitaMes = sales.filter(s => s.created_at && isSameMonth(parseDate(s.created_at)))
                             .reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
 
       const produtosEstoque = products.reduce((acc, p) => acc + Number(p.current_stock || 0), 0);
@@ -69,7 +67,7 @@ const Dashboard = () => {
       const lucroPotencial = valorPotencial - valorEmEstoque;
       
       // Cálculo do lucro de hoje
-      const vendasHojeDetalhes = sales.items.filter(s => s.created_at && isSameDay(parseDate(s.created_at)));
+      const vendasHojeDetalhes = sales.filter(s => s.created_at && isSameDay(parseDate(s.created_at)));
       let lucroHoje = 0;
       
       // Se tivermos acesso aos itens de venda com custo, podemos calcular o lucro real
@@ -89,7 +87,7 @@ const Dashboard = () => {
         lucroHoje = receitaHoje * 0.3;
       }
 
-      const recent = [...sales.items]
+      const recent = [...sales]
         .sort((a,b) => (new Date(b.created_at||0)) - (new Date(a.created_at||0)))
         .slice(0, 5)
         .map(s => ({
