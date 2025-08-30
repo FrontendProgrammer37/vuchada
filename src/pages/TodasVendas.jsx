@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, Download, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import apiService from '../services/api';
+import Modal from '../components/Modal';
 
 const TodasVendas = () => {
   const [vendas, setVendas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedVenda, setSelectedVenda] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [filtro, setFiltro] = useState({
     dataInicio: '',
     dataFim: '',
@@ -43,8 +46,6 @@ const TodasVendas = () => {
           new Date(v.created_at) <= new Date(filtro.dataFim)
         );
       }
-      
-      // Filtro de cliente removido
       
       if (filtro.status) {
         vendasFiltradas = vendasFiltradas.filter(v => 
@@ -168,133 +169,150 @@ const TodasVendas = () => {
     document.body.removeChild(link);
   };
 
+  const abrirDetalhesVenda = (venda) => {
+    setSelectedVenda(venda);
+    setIsModalOpen(true);
+  };
+
+  const formatarItensVenda = (itens) => {
+    if (!itens || !Array.isArray(itens)) return 'Nenhum item encontrado';
+    
+    return (
+      <div className="mt-4">
+        <h4 className="font-medium text-gray-900 mb-2">Itens da Venda</h4>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preço Unit.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {itens.map((item, index) => (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {item.product?.name || 'Produto não encontrado'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {item.quantity}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatarMoeda(item.unit_price)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatarMoeda(item.subtotal)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Todas as Vendas</h1>
-        <p className="mt-1 text-sm text-gray-500">Histórico completo de vendas</p>
-      </div>
-
-      {/* Filtros - Adaptado para mobile */}
-      <div className="bg-white shadow rounded-lg mb-6">
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-900">Filtros</h2>
-            <button 
-              type="button" 
-              onClick={() => document.getElementById('filtrosForm').classList.toggle('hidden')}
-              className="md:hidden inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
-            >
-              <Filter className="h-4 w-4 mr-1" />
-              Filtros
-            </button>
-          </div>
-          <form id="filtrosForm" onSubmit={aplicarFiltro} className="hidden md:block">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <label htmlFor="dataInicio" className="block text-sm font-medium text-gray-700">Data Início</label>
-                <input
-                  type="date"
-                  id="dataInicio"
-                  name="dataInicio"
-                  value={filtro.dataInicio}
-                  onChange={handleFiltroChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="dataFim" className="block text-sm font-medium text-gray-700">Data Fim</label>
-                <input
-                  type="date"
-                  id="dataFim"
-                  name="dataFim"
-                  value={filtro.dataFim}
-                  onChange={handleFiltroChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-              {/* Campo de cliente removido */}
-              <div>
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
-                <select
-                  id="status"
-                  name="status"
-                  value={filtro.status}
-                  onChange={handleFiltroChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                >
-                  <option value="">Todos</option>
-                  <option value="concluída">Concluída</option>
-                  <option value="pendente">Pendente</option>
-                  <option value="cancelada">Cancelada</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="valorMinimo" className="block text-sm font-medium text-gray-700">Valor Mínimo</label>
-                <input
-                  type="number"
-                  id="valorMinimo"
-                  name="valorMinimo"
-                  value={filtro.valorMinimo}
-                  onChange={handleFiltroChange}
-                  placeholder="0.00"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-              <div>
-                <label htmlFor="valorMaximo" className="block text-sm font-medium text-gray-700">Valor Máximo</label>
-                <input
-                  type="number"
-                  id="valorMaximo"
-                  name="valorMaximo"
-                  value={filtro.valorMaximo}
-                  onChange={handleFiltroChange}
-                  placeholder="0.00"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={limparFiltro}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Limpar
-              </button>
-              <button
-                type="submit"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Aplicar Filtros
-              </button>
-            </div>
-          </form>
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="sm:flex sm:items-center justify-between mb-6">
+        <div className="mb-4 sm:mb-0">
+          <h1 className="text-2xl font-semibold text-gray-900">Todas as Vendas</h1>
+          <p className="mt-1 text-sm text-gray-500">Histórico completo de vendas</p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={exportarCSV}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Exportar</span>
+          </button>
         </div>
       </div>
 
-      {/* Ações */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="text-sm text-gray-500">
-          Mostrando {Math.min(paginacao.total, 1 + (paginacao.pagina - 1) * paginacao.itensPorPagina)} - {Math.min(paginacao.total, paginacao.pagina * paginacao.itensPorPagina)} de {paginacao.total} vendas
-        </div>
+      {/* Mobile Filters */}
+      <div className="lg:hidden mb-4">
         <button
-          onClick={exportarCSV}
-          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          onClick={() => document.getElementById('filtrosForm').classList.toggle('hidden')}
+          className="w-full flex items-center justify-between px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
-          <Download className="h-4 w-4 mr-2" />
-          Exportar CSV
+          <span>Filtros</span>
+          <Filter className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Tabela de vendas */}
-      {loading ? (
+      {/* Filters */}
+      <div id="filtrosForm" className="bg-white shadow rounded-lg p-4 mb-6 hidden lg:block">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label htmlFor="dataInicio" className="block text-sm font-medium text-gray-700">Data Início</label>
+            <input
+              type="date"
+              id="dataInicio"
+              name="dataInicio"
+              value={filtro.dataInicio}
+              onChange={handleFiltroChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="dataFim" className="block text-sm font-medium text-gray-700">Data Fim</label>
+            <input
+              type="date"
+              id="dataFim"
+              name="dataFim"
+              value={filtro.dataFim}
+              onChange={handleFiltroChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+            <select
+              id="status"
+              name="status"
+              value={filtro.status}
+              onChange={handleFiltroChange}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="concluída">Concluída</option>
+              <option value="cancelada">Cancelada</option>
+              <option value="pendente">Pendente</option>
+            </select>
+          </div>
+          <div className="flex items-end space-x-2">
+            <button
+              type="button"
+              onClick={aplicarFiltro}
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
+            >
+              Aplicar Filtros
+            </button>
+            <button
+              type="button"
+              onClick={limparFiltro}
+              className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Limpar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {loading && (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
         </div>
-      ) : error ? (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
           <div className="flex">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
@@ -306,219 +324,200 @@ const TodasVendas = () => {
             </div>
           </div>
         </div>
-      ) : (
-        <>
-          {/* Versão mobile - Cards melhorados */}
-          <div className="block lg:hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {vendas.length === 0 ? (
-                <div className="bg-white shadow overflow-hidden sm:rounded-md p-6 text-center text-gray-500">
-                  Nenhuma venda encontrada
-                </div>
-              ) : (
-                vendas.map((venda) => (
-                  <div key={venda.id} className="bg-white shadow overflow-hidden sm:rounded-md">
-                    <div className={`h-2 w-full ${venda.status === 'cancelada' ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                    <div className="px-4 py-5 sm:px-6">
-                      <div className="flex justify-between">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">
-                          Venda #{venda.sale_number || venda.id}
-                        </h3>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venda.status === 'cancelada' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                          {venda.status || 'concluída'}
-                        </span>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">ID</p>
-                          <p className="font-medium">{venda.id}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Valor</p>
-                          <p className={`font-medium font-bold ${verificarValorReal(venda.total_amount) ? 'text-gray-900' : 'text-red-500'}`}>
-                            {formatarMoeda(venda.total_amount)}
-                          </p>
-                          {!verificarValorReal(venda.total_amount) && (
-                            <p className="text-xs text-red-500">Valor inválido</p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Data</p>
-                          <p className="font-medium">{formatarData(venda.created_at)}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500">Itens</p>
-                          <p className="font-medium">{venda.items?.length || 0}</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-gray-100">
-                        <a href={`/vendas/${venda.id}`} className="inline-flex items-center text-indigo-600 hover:text-indigo-900 text-sm font-medium">
-                          <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          Ver detalhes
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Versão desktop */}
-          <div className="hidden lg:block">
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID
-                    </th>
-                    {/* Coluna de cliente removida */}
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Itens
-                    </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">Ações</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {vendas.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
-                        Nenhuma venda encontrada
-                      </td>
-                    </tr>
-                  ) : (
-                    vendas.map((venda) => (
-                      <tr key={venda.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {venda.id}
-                        </td>
-                        {/* Célula de cliente removida */}
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className={`${verificarValorReal(venda.total_amount) ? 'text-gray-900' : 'text-red-500'}`}>
-                      {formatarMoeda(venda.total_amount)}
-                    </div>
-                    {!verificarValorReal(venda.total_amount) && (
-                      <div className="text-xs text-red-500">Valor inválido</div>
-                    )}
-                  </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatarData(venda.created_at)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${venda.status === 'cancelada' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                            {venda.status || 'concluída'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {venda.items?.length || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <a href={`/vendas/${venda.id}`} className="text-indigo-600 hover:text-indigo-900">
-                            Detalhes
-                          </a>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
       )}
 
-      {/* Paginação */}
-      {!loading && vendas.length > 0 && (
-        <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-md shadow">
-          <div className="flex flex-col space-y-3 sm:hidden w-full">
-            <div className="flex justify-center items-center">
-              <span className="text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-md">
-                Página {paginacao.pagina} de {Math.ceil(paginacao.total / paginacao.itensPorPagina)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <button
-                onClick={() => mudarPagina(paginacao.pagina - 1)}
-                disabled={paginacao.pagina === 1}
-                className={`flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ${paginacao.pagina === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Anterior
-              </button>
-              <button
-                onClick={() => mudarPagina(paginacao.pagina + 1)}
-                disabled={paginacao.pagina >= Math.ceil(paginacao.total / paginacao.itensPorPagina)}
-                className={`flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ${paginacao.pagina >= Math.ceil(paginacao.total / paginacao.itensPorPagina) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-              >
-                Próxima
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </button>
+      {/* Mobile View - Cards */}
+      <div className="lg:hidden space-y-4">
+        {!loading && !error && vendas.length === 0 && (
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6 text-center text-gray-500">
+            Nenhuma venda encontrada com os filtros atuais
+          </div>
+        )}
+        
+        {vendas.map((venda) => (
+          <div key={venda.id} className="bg-white shadow overflow-hidden rounded-lg">
+            <div className="px-4 py-5 sm:px-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Venda #{venda.sale_number || venda.id}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {formatarData(venda.created_at)}
+                  </p>
+                </div>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  venda.status === 'concluída' ? 'bg-green-100 text-green-800' :
+                  venda.status === 'cancelada' ? 'bg-red-100 text-red-800' :
+                  'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {venda.status || 'Pendente'}
+                </span>
+              </div>
+              
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Valor Total</p>
+                  <p className="font-medium">{formatarMoeda(venda.total_amount)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Itens</p>
+                  <p className="font-medium">{venda.items?.length || 0}</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <button
+                  onClick={() => abrirDetalhesVenda(venda)}
+                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Ver Detalhes
+                </button>
+              </div>
             </div>
           </div>
-          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+        ))}
+      </div>
+
+      {/* Desktop View - Table */}
+      <div className="hidden lg:block">
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Venda
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Data
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valor Total
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {!loading && !error && vendas.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                      Nenhuma venda encontrada com os filtros atuais
+                    </td>
+                  </tr>
+                ) : (
+                  vendas.map((venda) => (
+                    <tr key={venda.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          #{venda.sale_number || venda.id}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {formatarData(venda.created_at)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 font-medium">
+                          {formatarMoeda(venda.total_amount)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          venda.status === 'concluída' ? 'bg-green-100 text-green-800' :
+                          venda.status === 'cancelada' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {venda.status || 'Pendente'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => abrirDetalhesVenda(venda)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                          title="Ver detalhes"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {!loading && !error && vendas.length > 0 && (
+        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-6 rounded-lg shadow-sm">
+          <div className="flex-1 flex justify-between sm:hidden">
+            <button
+              onClick={() => mudarPagina(paginacao.pagina - 1)}
+              disabled={paginacao.pagina === 1}
+              className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                paginacao.pagina === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => mudarPagina(paginacao.pagina + 1)}
+              disabled={paginacao.pagina * paginacao.itensPorPagina >= paginacao.total}
+              className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                paginacao.pagina * paginacao.itensPorPagina >= paginacao.total
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              Próxima
+            </button>
+          </div>
+          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
-                Mostrando <span className="font-medium">{Math.min(paginacao.total, 1 + (paginacao.pagina - 1) * paginacao.itensPorPagina)}</span> a <span className="font-medium">{Math.min(paginacao.total, paginacao.pagina * paginacao.itensPorPagina)}</span> de <span className="font-medium">{paginacao.total}</span> resultados
+                Mostrando <span className="font-medium">{(paginacao.pagina - 1) * paginacao.itensPorPagina + 1}</span> a{' '}
+                <span className="font-medium">
+                  {Math.min(paginacao.pagina * paginacao.itensPorPagina, paginacao.total)}
+                </span>{' '}
+                de <span className="font-medium">{paginacao.total}</span> resultados
               </p>
             </div>
             <div>
-              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                 <button
                   onClick={() => mudarPagina(paginacao.pagina - 1)}
                   disabled={paginacao.pagina === 1}
-                  className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 ${paginacao.pagina === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 focus:z-20 focus:outline-offset-0'}`}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                    paginacao.pagina === 1
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'text-gray-500 hover:bg-gray-50'
+                  }`}
                 >
                   <span className="sr-only">Anterior</span>
                   <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                 </button>
-                
-                {/* Páginas */}
-                {Array.from({ length: Math.min(5, Math.ceil(paginacao.total / paginacao.itensPorPagina)) }, (_, i) => {
-                  // Lógica para mostrar páginas ao redor da página atual
-                  let pageNum;
-                  const totalPages = Math.ceil(paginacao.total / paginacao.itensPorPagina);
-                  
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (paginacao.pagina <= 3) {
-                    pageNum = i + 1;
-                  } else if (paginacao.pagina >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = paginacao.pagina - 2 + i;
-                  }
-                  
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => mudarPagina(pageNum)}
-                      aria-current={paginacao.pagina === pageNum ? 'page' : undefined}
-                      className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${paginacao.pagina === pageNum ? 'z-10 bg-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600' : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'}`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-                
+                <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                  Página {paginacao.pagina} de {Math.ceil(paginacao.total / paginacao.itensPorPagina)}
+                </span>
                 <button
                   onClick={() => mudarPagina(paginacao.pagina + 1)}
-                  disabled={paginacao.pagina >= Math.ceil(paginacao.total / paginacao.itensPorPagina)}
-                  className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 ${paginacao.pagina >= Math.ceil(paginacao.total / paginacao.itensPorPagina) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 focus:z-20 focus:outline-offset-0'}`}
+                  disabled={paginacao.pagina * paginacao.itensPorPagina >= paginacao.total}
+                  className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                    paginacao.pagina * paginacao.itensPorPagina >= paginacao.total
+                      ? 'text-gray-300 cursor-not-allowed'
+                      : 'text-gray-500 hover:bg-gray-50'
+                  }`}
                 >
                   <span className="sr-only">Próxima</span>
                   <ChevronRight className="h-5 w-5" aria-hidden="true" />
@@ -528,6 +527,147 @@ const TodasVendas = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Detalhes da Venda */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        title={`Detalhes da Venda ${selectedVenda?.sale_number || ''}`}
+      >
+        {selectedVenda && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Data</p>
+                <p className="font-medium">{formatarData(selectedVenda.created_at)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Status</p>
+                <p className="font-medium">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    selectedVenda.status === 'concluída' ? 'bg-green-100 text-green-800' :
+                    selectedVenda.status === 'cancelada' ? 'bg-red-100 text-red-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {selectedVenda.status || 'Pendente'}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Método de Pagamento</p>
+                <p className="font-medium capitalize">{selectedVenda.payment_method || 'Não informado'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Valor Total</p>
+                <p className="font-medium text-lg">{formatarMoeda(selectedVenda.total_amount)}</p>
+              </div>
+              {selectedVenda.customer && (
+                <div className="sm:col-span-2">
+                  <p className="text-sm text-gray-500">Cliente</p>
+                  <p className="font-medium">
+                    {selectedVenda.customer.name}
+                    {selectedVenda.customer.phone ? ` (${selectedVenda.customer.phone})` : ''}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6">
+              <h4 className="text-lg font-medium text-gray-900 mb-3">Itens da Venda</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Produto
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Qtd
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Preço Unit.
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Subtotal
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {selectedVenda.items?.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {item.product?.name || 'Produto não encontrado'}
+                          </div>
+                          {item.notes && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {item.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                          {item.quantity}x
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                          {formatarMoeda(item.unit_price)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                          {formatarMoeda(item.subtotal)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="3" className="text-right px-6 py-2 text-sm font-medium text-gray-500">
+                        Subtotal:
+                      </td>
+                      <td className="px-6 py-2 text-right text-sm font-medium text-gray-900">
+                        {formatarMoeda(selectedVenda.subtotal || 0)}
+                      </td>
+                    </tr>
+                    {selectedVenda.discount > 0 && (
+                      <tr>
+                        <td colSpan="3" className="text-right px-6 py-2 text-sm font-medium text-gray-500">
+                          Desconto:
+                        </td>
+                        <td className="px-6 py-2 text-right text-sm font-medium text-red-600">
+                          -{formatarMoeda(selectedVenda.discount || 0)}
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td colSpan="3" className="text-right px-6 py-2 text-sm font-medium text-gray-900">
+                        Total:
+                      </td>
+                      <td className="px-6 py-2 text-right text-base font-bold text-gray-900">
+                        {formatarMoeda(selectedVenda.total_amount || 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+            
+            {selectedVenda.notes && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Observações</h4>
+                <p className="text-sm text-gray-900 whitespace-pre-line">{selectedVenda.notes}</p>
+              </div>
+            )}
+            
+            <div className="mt-6 pt-6 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
