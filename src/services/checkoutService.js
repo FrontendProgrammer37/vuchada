@@ -81,6 +81,26 @@ const checkoutService = {
   },
 
   /**
+   * Remove um item do carrinho
+   * @param {number} productId - ID do produto a ser removido
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async removeItem(productId, sessionId = 'default') {
+    try {
+      return await apiService.request(`${CHECKOUT_ENDPOINT}/items/${productId}?session_id=${sessionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao remover item do carrinho:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Métodos de pagamento disponíveis
    */
   paymentMethods: {
