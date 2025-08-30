@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter, Download, ChevronLeft, ChevronRight, Calendar, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import salesService from '../services/salesService';
+import { getSales } from '../services/salesService';
 
 // Componente para exibir o status da venda
 const StatusBadge = ({ status }) => {
@@ -60,13 +60,13 @@ const TodasVendas = () => {
   });
 
   // Carregar vendas
-  const carregarVendas = async (pagina = 1) => {
+  const carregarVendas = async () => {
     try {
       setLoading(true);
       setError(null);
       
       const params = {
-        page: pagina,
+        page: paginacao.page,
         limit: paginacao.limit,
         ...(filtros.status && { status: filtros.status }),
         ...(filtros.startDate && { start_date: filtros.startDate }),
@@ -74,15 +74,14 @@ const TodasVendas = () => {
         ...(filtros.search && { search: filtros.search }),
       };
 
-      const response = await salesService.getSales(params);
+      const data = await getSales(params);
       
-      setVendas(response.items || []);
-      setPaginacao({
-        page: response.page || 1,
-        totalPages: Math.ceil((response.total || 0) / paginacao.limit),
-        total: response.total || 0,
-      });
-      
+      setVendas(data.items || []);
+      setPaginacao(prev => ({
+        ...prev,
+        total: data.total || 0,
+        totalPages: Math.ceil((data.total || 0) / paginacao.limit),
+      }));
     } catch (err) {
       console.error('Erro ao carregar vendas:', err);
       setError('Erro ao carregar as vendas. Tente novamente.');
@@ -147,7 +146,7 @@ const TodasVendas = () => {
 
   // Carregar vendas quando os filtros ou paginação mudar
   useEffect(() => {
-    carregarVendas(paginacao.page + 1);
+    carregarVendas();
   }, [paginacao.page, filtros]);
 
   return (
