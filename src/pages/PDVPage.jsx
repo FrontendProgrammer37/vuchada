@@ -151,40 +151,48 @@ const PDVPage = () => {
   };
 
   // Renderizar item do carrinho
-  const renderCartItem = (item) => (
-    <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100">
-      <div className="flex-1">
-        <div className="font-medium text-gray-800">{item.name}</div>
-        <div className="text-sm text-gray-500">
-          {formatCurrency(item.price)} × {item.quantity}
+  const renderCartItem = (item) => {
+    const unitPrice = parseFloat(item.unit_price || item.price || 0);
+    const totalPrice = parseFloat(item.total_price || (unitPrice * item.quantity) || 0);
+    
+    return (
+      <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100">
+        <div className="flex-1">
+          <div className="font-medium text-gray-800">{item.name || item.product_name || 'Produto sem nome'}</div>
+          <div className="text-sm text-gray-500">
+            {`${item.quantity} × ${unitPrice.toFixed(2)} MTn`}
+          </div>
+        </div>
+        <div className="font-medium text-gray-900">
+          {totalPrice.toFixed(2)} MTn
+        </div>
+        <div className="flex items-center space-x-2 ml-4">
+          <button
+            onClick={() => updateCartItem(item.product_id || item.id, item.quantity - 1)}
+            className="text-gray-500 hover:text-red-600 p-1 rounded-full hover:bg-gray-100"
+            aria-label="Diminuir quantidade"
+          >
+            <Minus size={16} />
+          </button>
+          <span className="w-8 text-center">{item.quantity}</span>
+          <button
+            onClick={() => updateCartItem(item.product_id || item.id, item.quantity + 1)}
+            className="text-gray-500 hover:text-green-600 p-1 rounded-full hover:bg-gray-100"
+            aria-label="Aumentar quantidade"
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            onClick={() => removeFromCart(item.product_id || item.id)}
+            className="text-red-500 hover:text-red-700 p-1 ml-2"
+            aria-label="Remover item"
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={() => updateCartItem(item.id, item.quantity - 1)}
-          className="text-gray-500 hover:text-red-600 p-1 rounded-full hover:bg-gray-100"
-          aria-label="Diminuir quantidade"
-        >
-          <Minus size={16} />
-        </button>
-        <span className="w-8 text-center">{item.quantity}</span>
-        <button
-          onClick={() => updateCartItem(item.id, item.quantity + 1)}
-          className="text-gray-500 hover:text-green-600 p-1 rounded-full hover:bg-gray-100"
-          aria-label="Aumentar quantidade"
-        >
-          <Plus size={16} />
-        </button>
-        <button
-          onClick={() => removeFromCart(item.id)}
-          className="text-red-500 hover:text-red-700 p-1 ml-2"
-          aria-label="Remover item"
-        >
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Renderizar produto na lista
   const renderProduct = (product) => (
