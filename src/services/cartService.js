@@ -1,40 +1,18 @@
 import apiService from './api';
 
-// Função auxiliar para obter o sessionId
-const getSessionId = () => {
-  let sessionId = localStorage.getItem('sessionId');
-  
-  // Se não existir um sessionId, gera um novo
-  if (!sessionId) {
-    sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('sessionId', sessionId);
-    console.log('Novo sessionId gerado:', sessionId);
-  }
-  
-  return sessionId;
-};
-
-const CART_BASE_URL = 'cart';
+const CART_ENDPOINT = '/api/v1/cart';
 
 const cartService = {
   // Adicionar item ao carrinho
   async addItem(productId, quantity = 1) {
     try {
-      console.log('Adicionando item ao carrinho:', { productId, quantity });
-      const sessionId = getSessionId();
-      
-      const response = await apiService.request(`${CART_BASE_URL}/add`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/add`, {
         method: 'POST',
-        headers: {
-          'X-Session-ID': sessionId
-        },
         body: {
           product_id: productId,
           quantity: quantity
         }
       });
-      
-      console.log('Resposta ao adicionar item:', response);
       return response;
     } catch (error) {
       console.error('Erro ao adicionar item ao carrinho:', error);
@@ -45,25 +23,13 @@ const cartService = {
   // Obter carrinho atual
   async getCart() {
     try {
-      const sessionId = getSessionId();
-      console.log('Obtendo carrinho. SessionId:', sessionId);
-      
-      const response = await apiService.request(CART_BASE_URL, {
-        method: 'GET',
-        headers: {
-          'X-Session-ID': sessionId
-        }
-      });
-      
-      console.log('Carrinho obtido:', response);
+      const response = await apiService.request(CART_ENDPOINT);
       return response;
     } catch (error) {
-      // Se o carrinho não existir (404), retorna um carrinho vazio
-      if (error.status === 404) {
-        console.log('Carrinho não encontrado, retornando carrinho vazio');
+      // Se o carrinho não existir, retorna um carrinho vazio
+      if (error.response?.status === 404) {
         return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
       }
-      
       console.error('Erro ao buscar carrinho:', error);
       throw error;
     }
@@ -72,20 +38,13 @@ const cartService = {
   // Atualizar quantidade de um item
   async updateItemQuantity(productId, quantity) {
     try {
-      console.log('Atualizando quantidade:', { productId, quantity });
-      const sessionId = getSessionId();
-      
-      const response = await apiService.request(`${CART_BASE_URL}/update`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/update`, {
         method: 'PUT',
-        headers: {
-          'X-Session-ID': sessionId
-        },
         body: {
           product_id: productId,
           quantity: quantity
         }
       });
-      
       return response;
     } catch (error) {
       console.error('Erro ao atualizar quantidade:', error);
@@ -96,19 +55,13 @@ const cartService = {
   // Remover item do carrinho
   async removeItem(productId) {
     try {
-      console.log('Removendo item do carrinho:', productId);
-      const sessionId = getSessionId();
-      
-      const response = await apiService.request(`${CART_BASE_URL}/items/${productId}`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
         method: 'DELETE',
-        headers: {
-          'X-Session-ID': sessionId
-        }
+        body: { product_id: productId }
       });
-      
       return response;
     } catch (error) {
-      console.error('Erro ao remover item do carrinho:', error);
+      console.error('Erro ao remover item:', error);
       throw error;
     }
   },
@@ -116,26 +69,12 @@ const cartService = {
   // Limpar carrinho
   async clearCart() {
     try {
-      console.log('Limpando carrinho');
-      const sessionId = getSessionId();
-      
-      const response = await apiService.request(CART_BASE_URL, {
-        method: 'DELETE',
-        headers: {
-          'X-Session-ID': sessionId
-        }
+      const response = await apiService.request(`${CART_ENDPOINT}/clear`, {
+        method: 'DELETE'
       });
-      
       return response;
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
-      
-      // Se for um erro 404, o carrinho já está vazio, então podemos considerar como sucesso
-      if (error.status === 404) {
-        console.log('Carrinho já está vazio');
-        return { success: true, message: 'Carrinho já está vazio' };
-      }
-      
       throw error;
     }
   },
@@ -152,26 +91,25 @@ const cartService = {
   },
 
   // Finalizar compra/checkout
-  async checkout(paymentMethod, customerId = null, notes = '') {
+  async checkout() {
     try {
-      console.log('Finalizando compra:', { paymentMethod, customerId, notes });
-      const sessionId = getSessionId();
-      
-      const response = await apiService.request(`${CART_BASE_URL}/checkout`, {
+      const response = await apiService.request('cart/checkout', {
         method: 'POST',
-        headers: {
-          'X-Session-ID': sessionId
-        },
         body: {
-          payment_method: paymentMethod,
-          customer_id: customerId,
-          notes: notes
+          payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
+          items: (await this.getCart()).items.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity
+          }))
         }
       });
       
+      // Clear cart after successful checkout
+      await this.clearCart();
+      
       return response;
     } catch (error) {
-      console.error('Erro ao finalizar compra:', error);
+      console.error('Erro ao finalizar venda:', error);
       throw error;
     }
   }

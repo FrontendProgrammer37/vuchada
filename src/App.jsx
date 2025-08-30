@@ -134,12 +134,10 @@ const AppContent = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <CartProvider>
-        <ToastContainer position="top-right" autoClose={5000} />
-        <Router>
-          <AppContent />
-        </Router>
-      </CartProvider>
+      <ToastContainer position="top-right" autoClose={5000} />
+      <Router>
+        <AppContent />
+      </Router>
     </AuthProvider>
   );
 };

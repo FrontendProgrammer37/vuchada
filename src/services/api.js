@@ -8,10 +8,9 @@ class ApiService {
     }
 
     // Configurar headers com token de autenticação
-    getHeaders(customHeaders = {}) {
+    getHeaders() {
         const headers = {
             'Content-Type': 'application/json',
-            ...customHeaders // Inclui headers personalizados
         };
         
         if (this.token) {
@@ -39,72 +38,51 @@ class ApiService {
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
         const url = `${this.baseURL}/${normalizedEndpoint}`;
         
-        // Obtém os headers personalizados das opções, se existirem
-        const customHeaders = options.headers || {};
-        const headers = this.getHeaders(customHeaders);
-        
-        // Se body for um objeto e não for FormData, converte para JSON
-        let body = options.body;
-        if (body && typeof body === 'object' && !(body instanceof FormData)) {
-            body = JSON.stringify(body);
-        } else if (body instanceof FormData) {
-            // Se for FormData, não definir Content-Type, o navegador fará isso automaticamente
-            // com o boundary correto
-            delete headers['Content-Type'];
-        }
-        
         const config = {
-            method: options.method || 'GET',
-            headers: headers,
-            ...options, // Isso sobrescreve os valores padrão se fornecidos
-            body: body
+            method: 'GET',
+            headers: this.getHeaders(),
+            ...options,
+            mode: 'cors', // Força o modo CORS
+            credentials: 'include', // Inclui credenciais se necessário
         };
 
         try {
-            console.log(`Enviando requisição para: ${url}`, { config });
             const response = await fetch(url, config);
             
+            if (!response.ok) {
+                let errorMessage = 'Erro na requisição';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || JSON.stringify(errorData);
+                } catch (e) {
+                    errorMessage = await response.text();
+                }
+                
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.response = response;
+                throw error;
+            }
+
             // Se a resposta for 204 (No Content), retorna null
             if (response.status === 204) {
                 return null;
             }
-            
+
             // Tenta fazer o parse da resposta como JSON
-            let data;
             try {
-                data = await response.json();
+                return await response.json();
             } catch (e) {
-                // Se não for possível fazer o parse como JSON, retorna o texto
-                const text = await response.text();
-                throw new Error(`Resposta inválida do servidor: ${text}`);
+                console.warn('Resposta não é um JSON válido:', e);
+                return await response.text();
             }
-            
-            // Se a resposta não for bem-sucedida, lança um erro
-            if (!response.ok) {
-                const error = new Error(data.detail || data.message || 'Erro na requisição');
-                error.status = response.status;
-                error.response = data;
-                throw error;
-            }
-            
-            return data;
         } catch (error) {
-            console.error(`Erro na requisição para ${url}:`, error);
-            
-            // Se o erro for de autenticação, remove o token
-            if (error.status === 401) {
-                this.removeToken();
-                // Redireciona para a página de login
-                if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
-                }
-            }
-            
-            // Se o erro não tiver status, adiciona um status padrão
-            if (!error.status) {
-                error.status = 0;
-            }
-            
+            console.error('Erro na requisição:', {
+                url,
+                error: error.message,
+                status: error.status,
+                response: error.response ? await error.response.text() : null
+            });
             throw error;
         }
     }
