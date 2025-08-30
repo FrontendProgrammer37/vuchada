@@ -91,16 +91,18 @@ const cartService = {
   },
 
   // Finalizar compra/checkout
-  async checkout() {
+  async checkout(paymentMethod, customerId = null, notes = '') {
     try {
+      if (!paymentMethod) {
+        throw new Error('Método de pagamento é obrigatório');
+      }
+
       const response = await apiService.request('cart/checkout', {
         method: 'POST',
         body: {
-          payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
-          items: (await this.getCart()).items.map(item => ({
-            product_id: item.id,
-            quantity: item.quantity
-          }))
+          payment_method: paymentMethod.toUpperCase(), // Ensure uppercase as required by the API
+          customer_id: customerId,
+          notes: notes
         }
       });
       

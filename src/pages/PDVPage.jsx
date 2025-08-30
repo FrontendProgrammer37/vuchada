@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Minus, X, Check, ShoppingCart } from 'lucide-react';
 import apiService from '../services/api';
+import cartService from '../services/cart'; // Import the cartService
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
@@ -129,26 +130,32 @@ const PDVPage = () => {
       return;
     }
 
+    // Adiciona os itens ao carrinho antes de finalizar
     try {
-      const result = await apiService.request('cart/checkout', {
-        method: 'POST',
-        body: JSON.stringify({
-          items: cart.map(item => ({
-            product_id: item.id,
-            quantity: item.quantity,
-            unit_price: item.sale_price,
-            subtotal: item.sale_price * item.quantity
-          })),
-          total: cartTotal,
-          // Adicione outros campos necessários aqui, como dados do cliente, pagamento, etc.
-        })
-      });
+      // Primeiro, limpa o carrinho para evitar itens duplicados
+      await cartService.clearCart();
+      
+      // Adiciona cada item ao carrinho
+      for (const item of cart) {
+        await cartService.addItem(item.id, item.quantity);
+      }
+
+      // Aqui você pode adicionar um modal para selecionar o método de pagamento
+      // Por enquanto, vamos usar 'DINHEIRO' como padrão
+      const paymentMethod = 'DINHEIRO'; // Você pode implementar um seletor de método de pagamento
+      
+      const result = await cartService.checkout(
+        paymentMethod,  // método de pagamento
+        null,           // customer_id (opcional)
+        ''              // notes (opcional)
+      );
+      
       alert(`Venda finalizada com sucesso! Número da venda: ${result.sale_number}`);
       setCart([]);
       setShowCart(false);
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
-      alert('Erro ao finalizar venda. Verifique o console para mais detalhes.');
+      alert(`Erro ao finalizar venda: ${error.message || 'Tente novamente mais tarde.'}`);
     }
   };
 
