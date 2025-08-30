@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Minus, X, Check, ShoppingCart } from 'lucide-react';
+import apiService from '../services/api';
 import cartService from '../services/cartService';
 import checkoutService from '../services/checkoutService';
 import { toast } from 'react-toastify';
