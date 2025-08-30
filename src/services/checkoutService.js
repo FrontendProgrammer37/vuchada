@@ -1,12 +1,12 @@
 import apiService from './api';
 
-const CHECKOUT_ENDPOINT = '/api/v1/checkout';
+const CHECKOUT_ENDPOINT = 'checkout';
 
 const checkoutService = {
   /**
    * Processa o checkout de um carrinho de compras
    * @param {Object} checkoutData Dados do checkout
-   * @param {string} checkoutData.payment_method Forma de pagamento (dinheiro, cartao_credito, cartao_debito, pix)
+   * @param {string} checkoutData.payment_method Forma de pagamento (DINHEIRO, MPESA, etc.)
    * @param {number} [checkoutData.amount_received] Valor recebido (para pagamento em dinheiro)
    * @param {string} [checkoutData.notes] Observações adicionais
    * @param {number} [checkoutData.customer_id] ID do cliente (opcional)
@@ -16,12 +16,13 @@ const checkoutService = {
     try {
       const response = await apiService.request(CHECKOUT_ENDPOINT, {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           payment_method: checkoutData.payment_method,
           amount_received: checkoutData.amount_received || 0,
           notes: checkoutData.notes || '',
-          customer_id: checkoutData.customer_id || null
-        })
+          customer_id: checkoutData.customer_id || null,
+          session_id: 'default' // Adicionando session_id conforme documentação
+        }
       });
       
       return response;
@@ -38,7 +39,7 @@ const checkoutService = {
    */
   async getSaleDetails(saleId) {
     try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales/${saleId}`);
+      return await apiService.request(`sales/${saleId}`);
     } catch (error) {
       console.error('Erro ao obter detalhes da venda:', error);
       throw error;
@@ -64,7 +65,7 @@ const checkoutService = {
         ...filters
       });
       
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales?${params.toString()}`);
+      return await apiService.request(`sales?${params.toString()}`);
     } catch (error) {
       console.error('Erro ao listar vendas:', error);
       throw error;
@@ -79,9 +80,9 @@ const checkoutService = {
    */
   async cancelSale(saleId, reason) {
     try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales/${saleId}/cancel`, {
+      return await apiService.request(`sales/${saleId}/cancel`, {
         method: 'POST',
-        body: JSON.stringify({ reason })
+        body: { reason }
       });
     } catch (error) {
       console.error('Erro ao cancelar venda:', error);
@@ -99,13 +100,9 @@ const checkoutService = {
    */
   async generatePaymentLink(paymentData) {
     try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/payment-link`, {
+      return await apiService.request('payment/generate-link', {
         method: 'POST',
-        body: JSON.stringify({
-          amount: paymentData.amount,
-          payment_method: paymentData.payment_method,
-          description: paymentData.description || ''
-        })
+        body: paymentData
       });
     } catch (error) {
       console.error('Erro ao gerar link de pagamento:', error);
@@ -120,9 +117,9 @@ const checkoutService = {
    */
   async getPaymentStatus(paymentId) {
     try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/payment/${paymentId}/status`);
+      return await apiService.request(`payment/status/${paymentId}`);
     } catch (error) {
-      console.error('Erro ao obter status do pagamento:', error);
+      console.error('Erro ao verificar status do pagamento:', error);
       throw error;
     }
   }

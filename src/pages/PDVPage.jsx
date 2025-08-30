@@ -207,7 +207,7 @@ const PDVPage = () => {
     }
   };
 
-  // Finalizar venda
+  // Função para finalizar a venda
   const handleCheckout = async () => {
     if (cart.items.length === 0) {
       alert('Adicione itens ao carrinho antes de finalizar a venda');
@@ -219,13 +219,22 @@ const PDVPage = () => {
       const result = await checkoutService.processCheckout({
         payment_method: paymentMethod,
         customer_id: customerId,
+        amount_received: cart.total, // Valor total do carrinho
         notes: ''
       });
       
-      alert(`Venda #${result.sale_number} finalizada com sucesso!`);
+      // Limpar carrinho após venda concluída
       await cartService.clearCart();
       setCart({ items: [], total: 0 });
-      setCustomerId(null);
+      
+      // Mostrar recibo ou mensagem de sucesso
+      alert(`Venda #${result.sale_number} finalizada com sucesso!`);
+      
+      // Fechar o carrinho após a venda (opcional)
+      if (isMobile) {
+        setShowCart(false);
+      }
+      
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
       alert(`Erro ao finalizar venda: ${error.message || 'Tente novamente mais tarde'}`);
