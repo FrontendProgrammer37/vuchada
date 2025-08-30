@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CHECKOUT_ENDPOINT = '/api/v1/cart';
+const CHECKOUT_ENDPOINT = '/cart'; 
 
 const checkoutService = {
   /**
@@ -12,12 +12,12 @@ const checkoutService = {
    */
   async addToCart(productId, quantity, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CHECKOUT_ENDPOINT}/add`, {
+      const response = await apiService.request(`${CHECKOUT_ENDPOINT}/add?session_id=${sessionId}`, {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           product_id: productId,
           quantity: quantity
-        })
+        }
       });
       
       return response;
@@ -48,20 +48,14 @@ const checkoutService = {
    * @param {number} [checkoutData.customer_id] ID do cliente (opcional)
    * @param {string} [checkoutData.notes] Observações adicionais
    * @param {string} [sessionId='default'] ID da sessão do carrinho
-   * @returns {Promise<Object>} Dados da venda processada
+   * @returns {Promise<Object>} Resposta da API com os dados da venda
    */
-  async processCheckout({ payment_method, customer_id = null, notes = '' }, sessionId = 'default') {
+  async processCheckout(checkoutData, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CHECKOUT_ENDPOINT}/checkout?session_id=${sessionId}`, {
+      return await apiService.request(`${CHECKOUT_ENDPOINT}/checkout?session_id=${sessionId}`, {
         method: 'POST',
-        body: JSON.stringify({
-          payment_method,
-          customer_id,
-          notes
-        })
+        body: checkoutData
       });
-      
-      return response;
     } catch (error) {
       console.error('Erro ao processar checkout:', error);
       throw error;
@@ -75,7 +69,7 @@ const checkoutService = {
    */
   async getSaleDetails(saleId) {
     try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales/${saleId}`);
+      return await apiService.request(`/sales/${saleId}`);
     } catch (error) {
       console.error('Erro ao obter detalhes da venda:', error);
       throw error;
@@ -86,17 +80,12 @@ const checkoutService = {
    * Métodos de pagamento disponíveis
    */
   paymentMethods: {
-    DINHEIRO: 'DINHEIRO',
+    CASH: 'DINHEIRO',
     MPESA: 'MPESA',
-    EMOLA: 'EMOLA',
-    CARTAO_POS: 'CARTAO_POS',
-    TRANSFERENCIA: 'TRANSFERENCIA',
-    MILLENNIUM: 'MILLENNIUM',
-    BCI: 'BCI',
-    STANDARD_BANK: 'STANDARD_BANK',
-    ABSA_BANK: 'ABSA_BANK',
-    LETSHEGO: 'LETSHEGO',
-    MYBUCKS: 'MYBUCKS'
+    POS_CARD: 'CARTAO_POS',
+    TRANSFER: 'TRANSFERENCIA',
+    CHECK: 'CHEQUE',
+    MOBILE_MONEY: 'DINHEIRO_MOVEL'
   }
 };
 
