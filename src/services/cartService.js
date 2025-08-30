@@ -90,19 +90,49 @@ const cartService = {
   },
 
   /**
-   * Limpa todos os itens do carrinho
+   * Limpa todos os itens do carrinho removendo-os individualmente
    * @param {string} [sessionId='default'] - ID da sessão do carrinho
-   * @returns {Promise<Object>} Resposta da API
+   * @returns {Promise<{success: boolean, message: string}>} Resultado da operação
    */
   async clearCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/clear?session_id=${sessionId}`, {
-        method: 'DELETE'
-      });
-      return response;
+      // 1. Obtém os itens atuais do carrinho
+      const cart = await this.getCart(sessionId);
+      
+      // 2. Verifica se há itens para remover
+      if (!cart.items || cart.items.length === 0) {
+        return { success: true, message: 'O carrinho já está vazio' };
+      }
+      
+      // 3. Remove cada item individualmente
+      const removePromises = cart.items.map(item => 
+        this.removeItem(item.product_id || item.id, sessionId)
+          .catch(error => {
+            console.error(`Erro ao remover item ${item.product_id || item.id}:`, error);
+            return { success: false, error };
+          })
+      );
+      
+      // 4. Aguarda todas as remoções serem concluídas
+      const results = await Promise.all(removePromises);
+      
+      // 5. Verifica se todas as remoções foram bem-sucedidas
+      const failedRemovals = results.filter(result => !result.success);
+      
+      if (failedRemovals.length > 0) {
+        console.error('Alguns itens não puderam ser removidos:', failedRemovals);
+        throw new Error(`Não foi possível remover ${failedRemovals.length} itens do carrinho`);
+      }
+      
+      return { 
+        success: true, 
+        message: 'Carrinho limpo com sucesso',
+        itemsRemoved: cart.items.length
+      };
+      
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
-      throw error;
+      throw new Error(`Erro ao limpar carrinho: ${error.message}`);
     }
   },
 
