@@ -27,9 +27,15 @@ class ApiService {
     }
 
     // Remover token (logout)
-    removeToken() {
+    async logout() {
+        // Clear local storage and token first
         this.token = null;
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Don't make the API call since the endpoint doesn't exist
+        // Just resolve immediately
+        return Promise.resolve();
     }
 
     // Função genérica para fazer requisições
@@ -142,27 +148,6 @@ class ApiService {
         } catch (error) {
             console.error('Erro no login:', error);
             throw error;
-        }
-    }
-
-    async logout() {
-        try {
-            // Try to call the logout endpoint, but don't wait for it to complete
-            // as the server might not respond if the session is already invalidated
-            this.request('auth/logout', { 
-                method: 'POST',
-                // Don't wait for response to avoid stream reading issues
-                signal: AbortSignal.timeout(1000) 
-            }).catch(console.warn);
-        } catch (error) {
-            console.warn('Erro ao fazer logout no servidor:', error);
-        } finally {
-            // Always remove tokens and user data from client-side
-            this.removeToken();
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
-            // Clear any other session-related data if needed
-            // e.g., cart items, preferences, etc.
         }
     }
 

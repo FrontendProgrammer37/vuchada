@@ -88,14 +88,8 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             setError(null);
             
-            // Call the API logout - don't await it to prevent blocking
-            apiService.logout().catch(error => {
-                console.warn('Warning during logout:', error);
-            });
-            
-            // Clear any local storage data
-            localStorage.removeItem('user');
-            localStorage.removeItem('token');
+            // Call the API logout - this will clear local storage
+            await apiService.logout();
             
         } catch (error) {
             console.error('Erro ao fazer logout:', error);
