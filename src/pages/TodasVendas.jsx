@@ -576,26 +576,25 @@ const TodasVendas = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {selectedVenda.sale_items?.length > 0 ? (
-                      selectedVenda.sale_items.map((item, index) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {item.product?.name || 'Produto não especificado'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.quantity}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatarMoeda(item.unit_price || 0)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                            {formatarMoeda((item.quantity || 0) * (item.unit_price || 0))}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
+                    {(selectedVenda.sale_items?.length > 0 ? selectedVenda.sale_items : selectedVenda.items || [])?.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {item.product?.name || item.name || 'Produto não especificado'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {item.quantity}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatarMoeda(item.unit_price || item.price || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                          {formatarMoeda((item.quantity || 0) * (item.unit_price || item.price || 0))}
+                        </td>
+                      </tr>
+                    ))}
+                    {!selectedVenda.sale_items?.length && !selectedVenda.items?.length && (
                       <tr>
                         <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
                           Nenhum item encontrado
