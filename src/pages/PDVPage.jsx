@@ -36,6 +36,163 @@ const PAYMENT_METHODS = [
   { value: 'MYBUCKS', label: 'MyBucks' }
 ];
 
+const WeightInputModal = ({ isOpen, onClose, product, onConfirm, isEditing }) => {
+  const [weight, setWeight] = useState('');
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setWeight('');
+      setValue('');
+      setError('');
+    }
+  }, [isOpen]);
+
+  const calculateWeight = (val) => {
+    if (!val || isNaN(val) || val <= 0) return '';
+    return (val / product.sale_price).toFixed(3);
+  };
+
+  const calculateValue = (w) => {
+    if (!w || isNaN(w) || w <= 0) return '';
+    return (w * product.sale_price).toFixed(2);
+  };
+
+  const handleWeightChange = (e) => {
+    const w = parseFloat(e.target.value);
+    setWeight(e.target.value);
+    setValue(calculateValue(w));
+    validateInput(w);
+  };
+
+  const handleValueChange = (e) => {
+    const val = parseFloat(e.target.value);
+    setValue(e.target.value);
+    setWeight(calculateWeight(val));
+    validateInput(calculateWeight(val));
+  };
+
+  const validateInput = (w) => {
+    if (!w || isNaN(w) || w <= 0) {
+      setError('Por favor, insira um valor válido');
+      return false;
+    }
+    if (product.track_inventory && w > product.current_stock) {
+      setError(`Estoque insuficiente. Disponível: ${product.current_stock} KG`);
+      return false;
+    }
+    setError('');
+    return true;
+  };
+
+  const handleConfirm = () => {
+    const w = parseFloat(weight);
+    if (validateInput(w)) {
+      onConfirm(product, w);
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg w-full max-w-md">
+        <div className="bg-blue-50 px-6 py-4 rounded-t-lg">
+          <h3 className="text-lg font-bold text-gray-900">Venda por Peso</h3>
+        </div>
+        
+        <div className="p-6">
+          <div className="mb-6">
+            <h4 className="text-lg font-medium text-gray-900">{product.name}</h4>
+            <p className="text-sm text-gray-500">Código: {product.code || 'N/A'}</p>
+            <p className="text-green-600 font-medium mt-1">
+              Preço por KG: {formatCurrency(product.sale_price)}/KG
+            </p>
+            {product.track_inventory && (
+              <p className="text-blue-600 text-sm mt-1">
+                Estoque disponível: {product.current_stock} KG
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Valor (MT)
+              </label>
+              <div className="relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 sm:text-sm">MT</span>
+                </div>
+                <input
+                  type="number"
+                  value={value}
+                  onChange={handleValueChange}
+                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-12 pr-12 sm:text-sm border-gray-300 rounded-md p-2 border"
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Peso (KG)
+              </label>
+              <div className="relative rounded-md shadow-sm">
+                <input
+                  type="number"
+                  value={weight}
+                  onChange={handleWeightChange}
+                  className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md p-2 border"
+                  placeholder="0.000"
+                  min="0"
+                  step="0.001"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 sm:text-sm">KG</span>
+                </div>
+              </div>
+              {weight && (
+                <p className="mt-1 text-sm text-gray-500">
+                  Peso: {parseFloat(weight).toFixed(3)} KG
+                </p>
+              )}
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3 rounded-b-lg">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={!weight || parseFloat(weight) <= 0 || !!error}
+            className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
+              !weight || parseFloat(weight) <= 0 || error
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {isEditing ? 'Atualizar' : 'Adicionar ao Carrinho'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PDVPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +203,6 @@ const PDVPage = () => {
   const [weightInput, setWeightInput] = useState({
     isOpen: false,
     product: null,
-    initialWeight: '0.100',
     isEditing: false,
     cartItemId: null
   });
@@ -88,11 +244,9 @@ const PDVPage = () => {
   const addToCart = async (product) => {
     try {
       if (product.is_weight_based) {
-        const maxWeight = product.track_inventory ? product.current_stock : null;
         setWeightInput({
           isOpen: true,
-          product: { ...product, maxWeight },
-          initialWeight: '0.100',
+          product: { ...product, maxWeight: product.track_inventory ? product.current_stock : null },
           isEditing: false
         });
         return;
@@ -107,22 +261,18 @@ const PDVPage = () => {
   };
 
   // Handle weight confirmation
-  const handleWeightConfirm = async (weight) => {
+  const handleWeightConfirm = async (product, weight) => {
     try {
-      const { product, isEditing, cartItemId } = weightInput;
-      
-      if (isEditing) {
-        await cartService.updateItemQuantity(cartItemId, weight);
-      } else {
-        await cartService.addItem(product, weight, true);
-      }
-      
+      await cartService.addItem({
+        ...product,
+        quantity: parseFloat(weight),
+        is_weight_based: true
+      });
       const updatedCart = await cartService.getCart();
-      setCart(updatedCart.items);
-      setWeightInput({ isOpen: false, product: null, isEditing: false, cartItemId: null });
-      setError(null);
-    } catch (err) {
-      setError(err.message || 'Erro ao processar item por peso');
+      setCart(updatedCart.items || []);
+    } catch (error) {
+      console.error('Error adding weighted item:', error);
+      // Handle error
     }
   };
 
@@ -284,7 +434,7 @@ const PDVPage = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6">
+    <div className="flex flex-col h-screen bg-gray-100">
       <div className="flex justify-between items-center mb-6">
         <div className="bg-white rounded-lg shadow-sm p-4">
           <h1 className="text-2xl font-bold text-gray-800">Nova Venda</h1>
@@ -328,7 +478,7 @@ const PDVPage = () => {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-1 overflow-hidden">
           {/* Área de produtos */}
           <div className={`${showCart && isMobile ? 'hidden' : 'block'} lg:block flex-1`}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -345,7 +495,7 @@ const PDVPage = () => {
           >
             <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden h-full">
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-800 flex items-center">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <ShoppingCart className="mr-2" size={20} />
                   Carrinho
                   {totalItems > 0 && (
@@ -363,7 +513,7 @@ const PDVPage = () => {
                 </button>
               </div>
 
-              <div className="flex flex-col h-[calc(100%-60px)]">
+              <div className="flex flex-1 flex flex-col overflow-hidden">
                 {cart.length === 0 ? (
                   <div className="text-center py-8 px-4 flex-1 flex flex-col items-center justify-center">
                     <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
@@ -374,89 +524,98 @@ const PDVPage = () => {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-y-auto flex-1 p-4">
+                    <div className={`overflow-y-auto ${cart.length > 2 ? 'h-1/2' : 'flex-1'}`}>
                       {cart.map(renderCartItem)}
                     </div>
                     
-                    <div className="border-t border-gray-100 p-4">
-                      <div className="mt-4 border-t border-gray-200 pt-4">
+                    {/* Payment Section */}
+                    <div className={`border-t border-gray-200 p-4 bg-white ${cart.length > 2 ? 'overflow-y-auto flex-1' : ''}`}>
+                      {/* Payment form */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Forma de Pagamento
+                        </label>
+                        <select
+                          value={paymentMethod}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white"
+                        >
+                          {PAYMENT_METHODS.map((method) => (
+                            <option key={method.value} value={method.value}>
+                              {method.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Amount Received (only for cash) */}
+                      {paymentMethod === 'DINHEIRO' && (
                         <div className="mb-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Forma de Pagamento
+                            Valor Recebido
                           </label>
-                          <select
-                            value={paymentMethod}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                          >
-                            {PAYMENT_METHODS.map((method) => (
-                              <option key={method.value} value={method.value}>
-                                {method.label}
-                              </option>
-                            ))}
-                          </select>
+                          <input
+                            type="number"
+                            value={amountReceived}
+                            onChange={(e) => setAmountReceived(e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            placeholder="0.00"
+                            min="0"
+                            step="0.01"
+                          />
+                          {parseFloat(amountReceived || 0) < cartTotal && (
+                            <p className="mt-1 text-sm text-red-600">
+                              Valor insuficiente
+                            </p>
+                          )}
                         </div>
+                      )}
 
-                        {paymentMethod === 'DINHEIRO' && (
-                          <>
-                            <div className="mb-2">
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Valor Recebido
-                              </label>
-                              <input
-                                type="number"
-                                value={amountReceived}
-                                onChange={(e) => setAmountReceived(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
-                              />
-                              {parseFloat(amountReceived || 0) < cartTotal && (
-                                <p className="mt-1 text-sm text-red-600">
-                                  Valor insuficiente
-                                </p>
-                              )}
-                            </div>
-                            {parseFloat(amountReceived || 0) > 0 && (
-                              <div className="flex justify-between items-center mb-4">
-                                <span className="font-medium">Troco:</span>
-                                <span className="font-bold text-green-600">
-                                  {formatCurrency(parseFloat(amountReceived) - cartTotal)}
-                                </span>
-                              </div>
-                            )}
-                          </>
+                      {/* Order Summary */}
+                      <div className="border-t border-gray-200 pt-3 mt-4">
+                        <div className="flex justify-between py-1">
+                          <span className="text-sm text-gray-600">Subtotal:</span>
+                          <span className="text-sm font-medium">{formatCurrency(cartTotal)}</span>
+                        </div>
+                        
+                        {paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) > 0 && (
+                          <div className="flex justify-between py-1">
+                            <span className="text-sm text-gray-600">Troco:</span>
+                            <span className="text-sm font-bold text-green-600">
+                              {formatCurrency(parseFloat(amountReceived) - cartTotal)}
+                            </span>
+                          </div>
                         )}
 
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium">Total:</span>
-                          <span className="font-bold">{formatCurrency(cartTotal)}</span>
+                        <div className="flex justify-between py-1 font-medium text-base mt-2">
+                          <span>Total:</span>
+                          <span>{formatCurrency(cartTotal)}</span>
                         </div>
-
-                        <button
-                          onClick={handleCheckout}
-                          disabled={
-                            cart.length === 0 || 
-                            (paymentMethod === 'DINHEIRO' && 
-                             (isNaN(parseFloat(amountReceived)) || 
-                              parseFloat(amountReceived || 0) < cartTotal))
-                          }
-                          className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white mt-4 ${
-                            cart.length === 0 || 
-                            (paymentMethod === 'DINHEIRO' && 
-                             (isNaN(parseFloat(amountReceived)) || 
-                              parseFloat(amountReceived || 0) < cartTotal))
-                              ? 'bg-gray-400 cursor-not-allowed'
-                              : 'bg-green-600 hover:bg-green-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-center">
-                            <Check className="mr-2" size={20} />
-                            Finalizar Venda
-                          </div>
-                        </button>
                       </div>
+
+                      {/* Checkout Button */}
+                      <button
+                        onClick={handleCheckout}
+                        disabled={
+                          cart.length === 0 || 
+                          (paymentMethod === 'DINHEIRO' && 
+                           (isNaN(parseFloat(amountReceived)) || 
+                            parseFloat(amountReceived || 0) < cartTotal))
+                        }
+                        className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white mt-4 ${
+                          cart.length === 0 || 
+                          (paymentMethod === 'DINHEIRO' && 
+                           (isNaN(parseFloat(amountReceived)) || 
+                            parseFloat(amountReceived || 0) < cartTotal))
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-green-600 hover:bg-green-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-center">
+                          <Check className="mr-2" size={20} />
+                          Finalizar Venda
+                        </div>
+                      </button>
                     </div>
                   </>
                 )}
@@ -483,6 +642,15 @@ const PDVPage = () => {
           </button>
         </div>
       )}
+
+      {/* Weight Input Modal */}
+      <WeightInputModal
+        isOpen={weightInput.isOpen}
+        onClose={() => setWeightInput({ ...weightInput, isOpen: false })}
+        product={weightInput.product}
+        onConfirm={handleWeightConfirm}
+        isEditing={weightInput.isEditing}
+      />
     </div>
   );
 };
