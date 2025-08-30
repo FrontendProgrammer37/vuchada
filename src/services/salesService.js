@@ -18,15 +18,26 @@ export const getSales = async (params = {}) => {
 
     const response = await api.get(`/sales?${queryParams}`);
     
+    // Ensure we always return an array for items
+    const items = Array.isArray(response?.data) ? response.data : [];
+    
     return {
-      items: Array.isArray(response.data) ? response.data : [],
-      total: response.data?.length || 0,
+      items,
+      total: response?.data?.length || 0,
       page: page,
-      limit: limit
+      limit: limit,
+      total_pages: Math.ceil((response?.data?.length || 0) / limit)
     };
   } catch (error) {
     console.error('Erro ao buscar vendas:', error);
-    throw error;
+    // Return default empty response on error
+    return {
+      items: [],
+      total: 0,
+      page: params.page || 0,
+      limit: params.limit || 10,
+      total_pages: 0
+    };
   }
 };
 

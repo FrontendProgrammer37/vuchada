@@ -40,12 +40,14 @@ const Dashboard = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [salesResponse, products] = await Promise.all([
+      const [salesResponse, productsResponse] = await Promise.all([
         getSales({ limit: 1000 }), // Fetch more sales to get accurate statistics
         apiService.getProducts()
       ]);
 
-      const sales = salesResponse.items || [];
+      const sales = Array.isArray(salesResponse?.items) ? salesResponse.items : [];
+      const products = Array.isArray(productsResponse) ? productsResponse : [];
+
       const now = new Date();
       const todayKey = now.toISOString().slice(0, 10);
       const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -54,14 +56,16 @@ const Dashboard = () => {
       const isSameDay = (d) => d.toISOString().slice(0,10) === todayKey;
       const isSameMonth = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` === monthKey;
 
-      const vendasHoje = sales.filter(s => s.created_at && isSameDay(parseDate(s.created_at))).length;
-      const vendasMes = sales.filter(s => s.created_at && isSameMonth(parseDate(s.created_at))).length;
-      const receitaHoje = sales.filter(s => s.created_at && isSameDay(parseDate(s.created_at)))
-                             .reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
-      const receitaMes = sales.filter(s => s.created_at && isSameMonth(parseDate(s.created_at)))
-                            .reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
+      const vendasHoje = sales.filter(s => s?.created_at && isSameDay(parseDate(s.created_at))).length;
+      const vendasMes = sales.filter(s => s?.created_at && isSameMonth(parseDate(s.created_at))).length;
+      const receitaHoje = sales
+        .filter(s => s?.created_at && isSameDay(parseDate(s.created_at)))
+        .reduce((acc, s) => acc + Number(s?.total_amount || 0), 0);
+      const receitaMes = sales
+        .filter(s => s?.created_at && isSameMonth(parseDate(s.created_at)))
+        .reduce((acc, s) => acc + Number(s?.total_amount || 0), 0);
 
-      const produtosEstoque = products.reduce((acc, p) => acc + Number(p.current_stock || 0), 0);
+      const produtosEstoque = products.reduce((acc, p) => acc + Number(p?.current_stock || 0), 0);
       
       // Novas métricas
       const valorEmEstoque = products.reduce((acc, p) => acc + (Number(p.cost_price || 0) * Number(p.current_stock || 0)), 0);
