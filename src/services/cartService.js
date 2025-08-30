@@ -76,11 +76,8 @@ const cartService = {
    */
   async removeItem(productId, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/remove?session_id=${sessionId}`, {
-        method: 'DELETE',
-        body: JSON.stringify({
-          product_id: productId
-        })
+      const response = await apiService.request(`${CART_ENDPOINT}/items/${productId}?session_id=${sessionId}`, {
+        method: 'DELETE'
       });
       return response;
     } catch (error) {
@@ -90,46 +87,55 @@ const cartService = {
   },
 
   /**
-   * Limpa todos os itens do carrinho removendo-os individualmente
+   * Limpa todos os itens do carrinho
    * @param {string} [sessionId='default'] - ID da sessão do carrinho
    * @returns {Promise<{success: boolean, message: string}>} Resultado da operação
    */
   async clearCart(sessionId = 'default') {
     try {
-      // 1. Obtém os itens atuais do carrinho
-      const cart = await this.getCart(sessionId);
-      
-      // 2. Verifica se há itens para remover
-      if (!cart.items || cart.items.length === 0) {
-        return { success: true, message: 'O carrinho já está vazio' };
+      // Tenta usar o endpoint de limpar carrinho se existir
+      try {
+        const response = await apiService.request(`${CART_ENDPOINT}/clear?session_id=${sessionId}`, {
+          method: 'DELETE'
+        });
+        return { 
+          success: true, 
+          message: 'Carrinho limpo com sucesso',
+          data: response
+        };
+      } catch (clearError) {
+        console.log('Endpoint /clear não disponível, removendo itens individualmente:', clearError);
+        
+        // Se o endpoint /clear não existir, remove os itens um por um
+        const cart = await this.getCart(sessionId);
+        if (!cart.items || cart.items.length === 0) {
+          return { success: true, message: 'O carrinho já está vazio' };
+        }
+
+        // Remove cada item individualmente
+        const removePromises = cart.items.map(item => 
+          this.removeItem(item.product_id || item.id, sessionId)
+            .then(() => ({ success: true }))
+            .catch(error => {
+              console.error(`Erro ao remover item ${item.product_id || item.id}:`, error);
+              return { success: false, error };
+            })
+        );
+
+        const results = await Promise.all(removePromises);
+        const failedRemovals = results.filter(result => !result.success);
+        
+        if (failedRemovals.length > 0) {
+          console.error('Alguns itens não puderam ser removidos:', failedRemovals);
+          throw new Error(`Não foi possível remover ${failedRemovals.length} itens do carrinho`);
+        }
+        
+        return { 
+          success: true, 
+          message: 'Carrinho limpo com sucesso',
+          itemsRemoved: cart.items.length
+        };
       }
-      
-      // 3. Remove cada item individualmente
-      const removePromises = cart.items.map(item => 
-        this.removeItem(item.product_id || item.id, sessionId)
-          .catch(error => {
-            console.error(`Erro ao remover item ${item.product_id || item.id}:`, error);
-            return { success: false, error };
-          })
-      );
-      
-      // 4. Aguarda todas as remoções serem concluídas
-      const results = await Promise.all(removePromises);
-      
-      // 5. Verifica se todas as remoções foram bem-sucedidas
-      const failedRemovals = results.filter(result => !result.success);
-      
-      if (failedRemovals.length > 0) {
-        console.error('Alguns itens não puderam ser removidos:', failedRemovals);
-        throw new Error(`Não foi possível remover ${failedRemovals.length} itens do carrinho`);
-      }
-      
-      return { 
-        success: true, 
-        message: 'Carrinho limpo com sucesso',
-        itemsRemoved: cart.items.length
-      };
-      
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
       throw new Error(`Erro ao limpar carrinho: ${error.message}`);

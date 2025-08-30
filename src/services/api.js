@@ -34,69 +34,72 @@ class ApiService {
 
     // Função genérica para fazer requisições
     async request(endpoint, options = {}) {
-        // Remove a barra inicial se existir para evitar duplicação
-        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        const url = `${this.baseURL}/${normalizedEndpoint}`;
-        
+        const url = `${this.baseURL}${endpoint}`;
         const config = {
-            method: 'GET',
-            headers: this.getHeaders(),
-            ...options,
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          }
         };
 
-        // Se o body for um objeto, converte para JSON
+        // Se o corpo for um objeto e não for FormData, converte para JSON
         if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
-            config.body = JSON.stringify(config.body);
-            config.headers = {
-                ...config.headers,
-                'Content-Type': 'application/json'
-            };
+          config.body = JSON.stringify(config.body);
         }
 
         try {
-            const response = await fetch(url, config);
-            
-            // Clona a resposta para podermos lê-la mais de uma vez se necessário
-            const responseClone = response.clone();
-            
-            // Se a resposta for 204 (No Content), retorna null
-            if (response.status === 204) {
-                return null;
-            }
+          const response = await fetch(url, config);
+          
+          // Clona a resposta para evitar problemas com múltiplas leituras
+          const responseClone = response.clone();
+          
+          // Se não houver conteúdo, retorna null
+          if (response.status === 204) {
+            return null;
+          }
 
-            // Tenta fazer o parse da resposta como JSON
-            try {
-                const data = await response.json();
-                // Se a resposta não for bem sucedida, lança um erro
-                if (!response.ok) {
-                    const error = new Error(data.detail || 'Erro na requisição');
-                    error.status = response.status;
-                    error.response = responseClone;
-                    error.data = data;
-                    throw error;
-                }
-                return data;
-            } catch (jsonError) {
-                // Se não for JSON, tenta ler como texto
-                if (!response.ok) {
-                    const text = await response.text();
-                    const error = new Error(text || 'Erro na requisição');
-                    error.status = response.status;
-                    error.response = responseClone;
-                    throw error;
-                }
-                // Se for sucesso mas não for JSON, retorna o texto
-                return await response.text();
+          // Tenta converter para JSON
+          try {
+            const data = await response.json();
+            
+            // Se a resposta não for bem-sucedida, lança um erro
+            if (!response.ok) {
+              const error = new Error(data.detail || 'Erro na requisição');
+              error.status = response.status;
+              error.response = responseClone; // Usa o clone para evitar problemas
+              error.data = data;
+              throw error;
             }
+            
+            return data;
+          } catch (jsonError) {
+            // Se não for possível converter para JSON, tenta ler como texto
+            if (!response.ok) {
+              const text = await responseClone.text();
+              const error = new Error(text || 'Erro na requisição');
+              error.status = response.status;
+              error.response = responseClone;
+              throw error;
+            }
+            
+            // Se a resposta for bem-sucedida mas não for JSON, retorna o texto
+            return await responseClone.text();
+          }
         } catch (error) {
-            console.error('Erro na requisição:', {
-                url,
-                error: error.message,
-                status: error.status,
-            });
-            throw error;
+          console.error('Erro na requisição:', { 
+            url, 
+            error: error.message, 
+            status: error.status,
+            response: error.response ? await error.response.text().catch(() => 'Não foi possível ler a resposta') : undefined
+          });
+          
+          // Se for um erro de rede, adiciona uma mensagem mais amigável
+          if (error.message === 'Failed to fetch') {
+            error.message = 'Não foi possível conectar ao servidor. Verifique sua conexão com a internet.';
+          }
+          
+          throw error;
         }
     }
 
