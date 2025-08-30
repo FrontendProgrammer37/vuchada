@@ -1,26 +1,63 @@
 import apiService from './api';
 
-const CHECKOUT_ENDPOINT = '/api/v1/checkout';
+const CHECKOUT_ENDPOINT = '/api/v1/cart';
 
 const checkoutService = {
   /**
-   * Processa o checkout de um carrinho de compras
-   * @param {Object} checkoutData Dados do checkout
-   * @param {string} checkoutData.payment_method Forma de pagamento (dinheiro, cartao_credito, cartao_debito, pix)
-   * @param {number} [checkoutData.amount_received] Valor recebido (para pagamento em dinheiro)
-   * @param {string} [checkoutData.notes] Observações adicionais
-   * @param {number} [checkoutData.customer_id] ID do cliente (opcional)
-   * @returns {Promise<Object>} Dados da venda processada
+   * Adiciona um item ao carrinho
+   * @param {number} productId - ID do produto
+   * @param {number} quantity - Quantidade do produto
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
    */
-  async processCheckout(checkoutData) {
+  async addToCart(productId, quantity, sessionId = 'default') {
     try {
-      const response = await apiService.request(CHECKOUT_ENDPOINT, {
+      const response = await apiService.request(`${CHECKOUT_ENDPOINT}/add`, {
         method: 'POST',
         body: JSON.stringify({
-          payment_method: checkoutData.payment_method,
-          amount_received: checkoutData.amount_received || 0,
-          notes: checkoutData.notes || '',
-          customer_id: checkoutData.customer_id || null
+          product_id: productId,
+          quantity: quantity
+        })
+      });
+      
+      return response;
+    } catch (error) {
+      console.error('Erro ao adicionar item ao carrinho:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtém os itens do carrinho
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Itens do carrinho
+   */
+  async getCart(sessionId = 'default') {
+    try {
+      return await apiService.request(`${CHECKOUT_ENDPOINT}?session_id=${sessionId}`);
+    } catch (error) {
+      console.error('Erro ao obter carrinho:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Processa o checkout de um carrinho de compras
+   * @param {Object} checkoutData Dados do checkout
+   * @param {string} checkoutData.payment_method Forma de pagamento (DINHEIRO, MPESA, CARTAO_POS, etc.)
+   * @param {number} [checkoutData.customer_id] ID do cliente (opcional)
+   * @param {string} [checkoutData.notes] Observações adicionais
+   * @param {string} [sessionId='default'] ID da sessão do carrinho
+   * @returns {Promise<Object>} Dados da venda processada
+   */
+  async processCheckout({ payment_method, customer_id = null, notes = '' }, sessionId = 'default') {
+    try {
+      const response = await apiService.request(`${CHECKOUT_ENDPOINT}/checkout?session_id=${sessionId}`, {
+        method: 'POST',
+        body: JSON.stringify({
+          payment_method,
+          customer_id,
+          notes
         })
       });
       
@@ -46,85 +83,20 @@ const checkoutService = {
   },
 
   /**
-   * Lista as vendas com filtros opcionais
-   * @param {Object} filters Filtros de busca
-   * @param {string} [filters.start_date] Data de início (YYYY-MM-DD)
-   * @param {string} [filters.end_date] Data de fim (YYYY-MM-DD)
-   * @param {string} [filters.payment_method] Forma de pagamento
-   * @param {number} [filters.customer_id] ID do cliente
-   * @param {number} [page=1] Número da página
-   * @param {number} [limit=10] Itens por página
-   * @returns {Promise<Object>} Lista de vendas e metadados de paginação
+   * Métodos de pagamento disponíveis
    */
-  async listSales(filters = {}, page = 1, limit = 10) {
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        ...filters
-      });
-      
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales?${params.toString()}`);
-    } catch (error) {
-      console.error('Erro ao listar vendas:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Cancela uma venda
-   * @param {number} saleId ID da venda a ser cancelada
-   * @param {string} reason Motivo do cancelamento
-   * @returns {Promise<Object>} Resultado da operação
-   */
-  async cancelSale(saleId, reason) {
-    try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/sales/${saleId}/cancel`, {
-        method: 'POST',
-        body: JSON.stringify({ reason })
-      });
-    } catch (error) {
-      console.error('Erro ao cancelar venda:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Gera um link de pagamento (para PIX, boleto, etc.)
-   * @param {Object} paymentData Dados do pagamento
-   * @param {number} paymentData.amount Valor do pagamento
-   * @param {string} paymentData.payment_method Método de pagamento (pix, boleto, etc.)
-   * @param {string} [paymentData.description] Descrição do pagamento
-   * @returns {Promise<Object>} Dados do link de pagamento
-   */
-  async generatePaymentLink(paymentData) {
-    try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/payment-link`, {
-        method: 'POST',
-        body: JSON.stringify({
-          amount: paymentData.amount,
-          payment_method: paymentData.payment_method,
-          description: paymentData.description || ''
-        })
-      });
-    } catch (error) {
-      console.error('Erro ao gerar link de pagamento:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Obtém o status de um pagamento
-   * @param {string} paymentId ID do pagamento
-   * @returns {Promise<Object>} Status do pagamento
-   */
-  async getPaymentStatus(paymentId) {
-    try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}/payment/${paymentId}/status`);
-    } catch (error) {
-      console.error('Erro ao obter status do pagamento:', error);
-      throw error;
-    }
+  paymentMethods: {
+    DINHEIRO: 'DINHEIRO',
+    MPESA: 'MPESA',
+    EMOLA: 'EMOLA',
+    CARTAO_POS: 'CARTAO_POS',
+    TRANSFERENCIA: 'TRANSFERENCIA',
+    MILLENNIUM: 'MILLENNIUM',
+    BCI: 'BCI',
+    STANDARD_BANK: 'STANDARD_BANK',
+    ABSA_BANK: 'ABSA_BANK',
+    LETSHEGO: 'LETSHEGO',
+    MYBUCKS: 'MYBUCKS'
   }
 };
 

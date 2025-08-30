@@ -3,10 +3,16 @@ import apiService from './api';
 const CART_ENDPOINT = '/api/v1/cart';
 
 const cartService = {
-  // Adicionar item ao carrinho
-  async addItem(productId, quantity = 1) {
+  /**
+   * Adiciona um item ao carrinho
+   * @param {number} productId - ID do produto
+   * @param {number} [quantity=1] - Quantidade do produto
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async addItem(productId, quantity = 1, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/add`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/add?session_id=${sessionId}`, {
         method: 'POST',
         body: {
           product_id: productId,
@@ -20,10 +26,14 @@ const cartService = {
     }
   },
 
-  // Obter carrinho atual
-  async getCart() {
+  /**
+   * Obtém o carrinho atual
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Dados do carrinho
+   */
+  async getCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(CART_ENDPOINT);
+      const response = await apiService.request(`${CART_ENDPOINT}?session_id=${sessionId}`);
       return response;
     } catch (error) {
       // Se o carrinho não existir, retorna um carrinho vazio
@@ -35,10 +45,16 @@ const cartService = {
     }
   },
 
-  // Atualizar quantidade de um item
-  async updateItemQuantity(productId, quantity) {
+  /**
+   * Atualiza a quantidade de um item no carrinho
+   * @param {number} productId - ID do produto
+   * @param {number} quantity - Nova quantidade
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async updateItemQuantity(productId, quantity, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/update`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/update?session_id=${sessionId}`, {
         method: 'PUT',
         body: {
           product_id: productId,
@@ -52,24 +68,35 @@ const cartService = {
     }
   },
 
-  // Remover item do carrinho
-  async removeItem(productId) {
+  /**
+   * Remove um item do carrinho
+   * @param {number} productId - ID do produto a ser removido
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async removeItem(productId, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/remove?session_id=${sessionId}`, {
         method: 'DELETE',
-        body: { product_id: productId }
+        body: {
+          product_id: productId
+        }
       });
       return response;
     } catch (error) {
-      console.error('Erro ao remover item:', error);
+      console.error('Erro ao remover item do carrinho:', error);
       throw error;
     }
   },
 
-  // Limpar carrinho
-  async clearCart() {
+  /**
+   * Limpa todos os itens do carrinho
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async clearCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/clear`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/clear?session_id=${sessionId}`, {
         method: 'DELETE'
       });
       return response;
@@ -79,39 +106,25 @@ const cartService = {
     }
   },
 
-  // Verificar se um item está no carrinho
+  /**
+   * Verifica se um item está no carrinho
+   * @param {Array} items - Lista de itens do carrinho
+   * @param {number} productId - ID do produto a ser verificado
+   * @returns {boolean} Verdadeiro se o item estiver no carrinho
+   */
   isInCart(items, productId) {
     return items.some(item => item.product_id === productId);
   },
 
-  // Obter quantidade de um item no carrinho
+  /**
+   * Obtém a quantidade de um item no carrinho
+   * @param {Array} items - Lista de itens do carrinho
+   * @param {number} productId - ID do produto
+   * @returns {number} Quantidade do item no carrinho
+   */
   getItemQuantity(items, productId) {
     const item = items.find(item => item.product_id === productId);
     return item ? item.quantity : 0;
-  },
-
-  // Finalizar compra/checkout
-  async checkout() {
-    try {
-      const response = await apiService.request('cart/checkout', {
-        method: 'POST',
-        body: {
-          payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
-          items: (await this.getCart()).items.map(item => ({
-            product_id: item.id,
-            quantity: item.quantity
-          }))
-        }
-      });
-      
-      // Clear cart after successful checkout
-      await this.clearCart();
-      
-      return response;
-    } catch (error) {
-      console.error('Erro ao finalizar venda:', error);
-      throw error;
-    }
   }
 };
 

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, Minus, X, Check, ShoppingCart } from 'lucide-react';
-import apiService from '../services/api';
+import cartService from '../services/cartService';
+import checkoutService from '../services/checkoutService';
+import { toast } from 'react-toastify';
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
@@ -16,47 +18,172 @@ const PDVPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState({ items: [], subtotal: 0, total: 0, itemCount: 0 });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [showCart, setShowCart] = useState(!isMobile);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  // Buscar produtos da API
+  // Buscar produtos e carrinho ao carregar a página
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        // Busca todos os produtos sem paginação para o PDV
+        // Buscar produtos
         const productsData = await apiService.getProducts({ limit: 1000 });
         setProducts(productsData);
+        
+        // Buscar carrinho atual
+        await loadCart();
       } catch (err) {
-        console.error('Erro ao buscar produtos:', err);
-        setError('Erro ao carregar produtos. Tente novamente mais tarde.');
+        console.error('Erro ao carregar dados:', err);
+        setError('Erro ao carregar dados. Tente novamente mais tarde.');
+        toast.error('Erro ao carregar dados do sistema');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchData();
   }, []);
 
-  // Adicionar item ao carrinho
-  const addToCart = (product) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.id === product.id);
-      if (existingItem) {
-        return prevCart.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prevCart, { 
-        ...product, 
-        quantity: 1,
-        price: product.sale_price // Usar preço de venda do produto
-      }];
-    });
+  // Carregar carrinho do servidor
+  const loadCart = async () => {
+    try {
+      const cartData = await cartService.getCart();
+      setCart({
+        items: cartData.items || [],
+        subtotal: cartData.subtotal || 0,
+        total: cartData.total || 0,
+        itemCount: cartData.item_count || 0
+      });
+    } catch (error) {
+      console.error('Erro ao carregar carrinho:', error);
+      toast.error('Erro ao carregar carrinho');
+    }
   };
+
+  // Adicionar item ao carrinho
+  const addToCart = async (product) => {
+    try {
+      await cartService.addItem(product.id, 1);
+      await loadCart(); // Recarrega o carrinho após adicionar item
+      toast.success(`${product.name} adicionado ao carrinho`);
+    } catch (error) {
+      console.error('Erro ao adicionar item:', error);
+      toast.error('Erro ao adicionar item ao carrinho');
+    }
+  };
+
+  // Atualizar quantidade de um item no carrinho
+  const updateCartItem = async (productId, newQuantity) => {
+    try {
+      if (newQuantity < 1) {
+        await cartService.removeItem(productId);
+      } else {
+        await cartService.updateItemQuantity(productId, newQuantity);
+      }
+      await loadCart();
+    } catch (error) {
+      console.error('Erro ao atualizar carrinho:', error);
+      toast.error('Erro ao atualizar carrinho');
+    }
+  };
+
+  // Remover item do carrinho
+  const removeFromCart = async (productId) => {
+    try {
+      await cartService.removeItem(productId);
+      await loadCart();
+      toast.success('Item removido do carrinho');
+    } catch (error) {
+      console.error('Erro ao remover item:', error);
+      toast.error('Erro ao remover item do carrinho');
+    }
+  };
+
+  // Limpar carrinho
+  const clearCart = async () => {
+    try {
+      await cartService.clearCart();
+      await loadCart();
+      toast.success('Carrinho limpo com sucesso');
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      toast.error('Erro ao limpar carrinho');
+    }
+  };
+
+  // Finalizar venda
+  const handleCheckout = async () => {
+    if (cart.items.length === 0) {
+      toast.warning('Adicione itens ao carrinho antes de finalizar a venda');
+      return;
+    }
+
+    setIsCheckingOut(true);
+    
+    try {
+      // Aqui você pode adicionar mais lógica como seleção de cliente, forma de pagamento, etc.
+      const saleData = {
+        payment_method: 'DINHEIRO', // Exemplo - implementar seleção de forma de pagamento
+        customer_id: null, // Implementar seleção de cliente se necessário
+        notes: 'Venda realizada pelo PDV'
+      };
+      
+      const result = await checkoutService.processCheckout(saleData);
+      
+      // Limpar carrinho após venda concluída
+      await cartService.clearCart();
+      await loadCart();
+      
+      toast.success(`Venda #${result.sale_number} finalizada com sucesso!`);
+      
+      // Aqui você pode redirecionar para o comprovante ou fazer outra ação
+      console.log('Venda finalizada:', result);
+      
+    } catch (error) {
+      console.error('Erro ao finalizar venda:', error);
+      toast.error(`Erro ao finalizar venda: ${error.message || 'Tente novamente'}`);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  // Renderizar item do carrinho
+  const renderCartItem = (item) => (
+    <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100">
+      <div className="flex-1">
+        <div className="font-medium text-gray-800">{item.name}</div>
+        <div className="text-sm text-gray-500">
+          {formatCurrency(item.price)} × {item.quantity}
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={() => updateCartItem(item.id, item.quantity - 1)}
+          className="text-gray-500 hover:text-red-600 p-1 rounded-full hover:bg-gray-100"
+          aria-label="Diminuir quantidade"
+        >
+          <Minus size={16} />
+        </button>
+        <span className="w-8 text-center">{item.quantity}</span>
+        <button
+          onClick={() => updateCartItem(item.id, item.quantity + 1)}
+          className="text-gray-500 hover:text-green-600 p-1 rounded-full hover:bg-gray-100"
+          aria-label="Aumentar quantidade"
+        >
+          <Plus size={16} />
+        </button>
+        <button
+          onClick={() => removeFromCart(item.id)}
+          className="text-red-500 hover:text-red-700 p-1 ml-2"
+          aria-label="Remover item"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
 
   // Renderizar produto na lista
   const renderProduct = (product) => (
@@ -76,103 +203,9 @@ const PDVPage = () => {
     </div>
   );
 
-  // Renderizar item do carrinho
-  const renderCartItem = (item) => (
-    <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100">
-      <div className="flex-1">
-        <div className="font-medium text-gray-800">{item.name}</div>
-        <div className="text-sm text-gray-500">
-          {formatCurrency(item.price)} × {item.quantity}
-        </div>
-      </div>
-      <div className="flex items-center space-x-1">
-        <button
-          onClick={() => {
-            const newQuantity = item.quantity - 1;
-            if (newQuantity === 0) {
-              setCart(cart.filter(i => i.id !== item.id));
-            } else {
-              setCart(cart.map(i =>
-                i.id === item.id ? { ...i, quantity: newQuantity } : i
-              ));
-            }
-          }}
-          className="text-gray-500 hover:text-red-600 p-1 rounded-full hover:bg-gray-100"
-          aria-label="Diminuir quantidade"
-        >
-          <Minus size={16} />
-        </button>
-        <span className="mx-2 w-6 text-center text-gray-700">{item.quantity}</span>
-        <button
-          onClick={() => {
-            setCart(cart.map(i =>
-              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-            ));
-          }}
-          className="text-gray-500 hover:text-green-600 p-1 rounded-full hover:bg-gray-100"
-          aria-label="Aumentar quantidade"
-        >
-          <Plus size={16} />
-        </button>
-      </div>
-    </div>
-  );
-
   // Calcular total do carrinho
-  const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Função para finalizar a venda
-  const handleCheckout = async () => {
-    if (cart.length === 0) {
-      alert('Adicione itens ao carrinho antes de finalizar a venda');
-      return;
-    }
-
-    try {
-      const result = await apiService.request('cart/checkout', {
-        method: 'POST',
-        body: JSON.stringify({
-          items: cart.map(item => ({
-            product_id: item.id,
-            quantity: item.quantity,
-            unit_price: item.sale_price,
-            subtotal: item.sale_price * item.quantity
-          })),
-          total: cartTotal,
-          // Adicione outros campos necessários aqui, como dados do cliente, pagamento, etc.
-        })
-      });
-      alert(`Venda finalizada com sucesso! Número da venda: ${result.sale_number}`);
-      setCart([]);
-      setShowCart(false);
-    } catch (error) {
-      console.error('Erro ao finalizar venda:', error);
-      alert('Erro ao finalizar venda. Verifique o console para mais detalhes.');
-    }
-  };
-
-  // Limpar carrinho
-  const clearCart = () => {
-    if (window.confirm('Tem certeza que deseja limpar o carrinho?')) {
-      setCart([]);
-    }
-  };
-
-  // Renderizar botão de limpar carrinho (visível apenas quando houver itens)
-  const renderClearCartButton = () => {
-    if (cart.length === 0) return null;
-    
-    return (
-      <button
-        onClick={clearCart}
-        className="mt-2 w-full bg-red-100 hover:bg-red-200 text-red-700 py-1.5 px-4 rounded-md text-sm font-medium flex items-center justify-center transition-colors"
-      >
-        <X size={16} className="mr-1" />
-        Limpar Venda
-      </button>
-    );
-  };
+  const cartTotal = cart.total;
+  const totalItems = cart.itemCount;
 
   return (
     <div className="container mx-auto p-4 md:p-6">
@@ -255,7 +288,7 @@ const PDVPage = () => {
               </div>
 
               <div className="flex flex-col h-[calc(100%-60px)]">
-                {cart.length === 0 ? (
+                {cart.items.length === 0 ? (
                   <div className="text-center py-8 px-4 flex-1 flex flex-col items-center justify-center">
                     <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
                       <ShoppingCart className="text-gray-400" size={24} />
@@ -266,7 +299,7 @@ const PDVPage = () => {
                 ) : (
                   <>
                     <div className="overflow-y-auto flex-1 p-4">
-                      {cart.map(renderCartItem)}
+                      {cart.items.map(renderCartItem)}
                     </div>
                     
                     <div className="border-t border-gray-100 p-4">
@@ -279,14 +312,34 @@ const PDVPage = () => {
                       
                       <button
                         onClick={handleCheckout}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-md font-medium flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={cart.length === 0}
+                        className={`w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-md font-medium flex items-center justify-center transition-colors ${
+                          cart.items.length === 0 || isCheckingOut ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        disabled={cart.items.length === 0 || isCheckingOut}
                       >
-                        <Check className="mr-2" size={18} />
-                        Finalizar Venda
+                        {isCheckingOut ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Processando...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="mr-2" size={18} />
+                            Finalizar Venda
+                          </>
+                        )}
                       </button>
                       
-                      {renderClearCartButton()}
+                      <button
+                        onClick={clearCart}
+                        className="mt-2 w-full bg-red-100 hover:bg-red-200 text-red-700 py-1.5 px-4 rounded-md text-sm font-medium flex items-center justify-center transition-colors"
+                      >
+                        <X size={16} className="mr-1" />
+                        Limpar Venda
+                      </button>
                     </div>
                   </>
                 )}
