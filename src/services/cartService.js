@@ -117,10 +117,13 @@ const cartService = {
   async updateItemQuantity(productId, quantity, sessionId = 'default') {
     try {
       const response = await apiService.request(
-        `${CART_BASE_URL}/cart/items/${productId}?session_id=${sessionId}`,
+        `${CART_BASE_URL}/update?session_id=${sessionId}`,
         {
-          method: 'PATCH',
-          body: { quantity }
+          method: 'POST',
+          body: { 
+            product_id: productId,
+            quantity: quantity 
+          }
         }
       );
       return response;
