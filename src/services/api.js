@@ -2,503 +2,492 @@
 import config from '../config/env';
 
 class ApiService {
-  constructor() {
-    // Garante que não há barras no final da URL base
-    this.baseURL = config.API_URL.replace(/\/+$/, '');
-    this.token = localStorage.getItem('token');
-    console.log('API Service initialized with base URL:', this.baseURL);
-  }
-
-  // Configurar headers com token de autenticação
-  getHeaders(contentType = 'application/json') {
-    const headers = new Headers();
-    
-    // Só adiciona Content-Type se não for FormData
-    if (contentType && !(contentType instanceof FormData)) {
-      headers.append('Content-Type', contentType);
+    constructor() {
+        this.baseURL = config.API_URL; // Já inclui /api/v1 no ambiente de produção
+        this.token = localStorage.getItem('token');
     }
-    
-    headers.append('Accept', 'application/json');
-    
-    if (this.token) {
-      headers.append('Authorization', `Bearer ${this.token}`);
-    }
-    
-    return headers;
-  }
 
-  // Atualizar token
-  setToken(token) {
-    this.token = token;
-    if (token) {
-      localStorage.setItem('token', token);
-    } else {
-      localStorage.removeItem('token');
-    }
-  }
-
-  // Remover token (logout)
-  removeToken() {
-    this.token = null;
-    localStorage.removeItem('token');
-  }
-
-  // Método genérico para fazer requisições
-  async request(endpoint, options = {}) {
-    try {
-      // Remove barras iniciais duplicadas
-      const normalizedEndpoint = endpoint.replace(/^\/+/, '');
-      const url = `${this.baseURL}/${normalizedEndpoint}`;
-      
-      // Determina o tipo de conteúdo
-      const isFormData = options.body instanceof FormData;
-      const isFormUrlEncoded = options.headers?.['Content-Type']?.includes('application/x-www-form-urlencoded');
-      
-      const config = {
-        method: 'GET',
-        headers: this.getHeaders(isFormData ? undefined : (options.headers?.['Content-Type'] || 'application/json')),
-        ...options,
-        mode: 'cors',
-        credentials: 'include',
-      };
-
-      // Se o body for um objeto e não for FormData ou form-urlencoded, converte para JSON
-      if (config.body && typeof config.body === 'object' && !isFormData && !isFormUrlEncoded) {
-        config.body = JSON.stringify(config.body);
-      }
-
-      console.log(`[${config.method}] ${url}`, { 
-        endpoint,
-        config: {
-          ...config,
-          // Não logar o body inteiro por segurança
-          body: config.body ? '[BODY]' : undefined
-        } 
-      });
-      
-      const response = await fetch(url, config);
-      
-      // Clona a resposta para podermos ler o corpo mais de uma vez se necessário
-      const responseClone = response.clone();
-      
-      // Verifica se a resposta é um JSON
-      const responseContentType = response.headers.get('content-type');
-      const isJson = responseContentType && responseContentType.includes('application/json');
-      
-      // Se a resposta for 204 (No Content), retorna null
-      if (response.status === 204) {
-        return null;
-      }
-      
-      // Processa a resposta
-      const data = isJson ? await response.json() : await response.text();
-      
-      console.log(`[${config.method}] ${url} - Status: ${response.status}`, { data });
-      
-      // Se a resposta não for OK, lança um erro
-      if (!response.ok) {
-        const error = new Error(data?.message || `HTTP error! status: ${response.status}`);
-        error.status = response.status;
-        error.data = data;
-        throw error;
-      }
-      
-      return data;
-      
-    } catch (error) {
-      console.error('API Request Error:', {
-        endpoint,
-        error: error.message,
-        status: error.status,
-        data: error.data
-      });
-      throw error;
-    }
-  }
-
-  // Métodos HTTP específicos
-  get(endpoint, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    const url = query ? `${endpoint}?${query}` : endpoint;
-    return this.request(url, { method: 'GET' });
-  }
-
-  post(endpoint, data = {}, options = {}) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: data,
-      ...options
-    });
-  }
-
-  put(endpoint, data = {}) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: data
-    });
-  }
-
-  delete(endpoint) {
-    return this.request(endpoint, { method: 'DELETE' });
-  }
-
-  // Método específico para login
-  async login(username, password) {
-    const formData = new URLSearchParams();
-    formData.append('username', username);
-    formData.append('password', password);
-    
-    try {
-      const data = await this.request('auth/login', {
-        method: 'POST',
-        body: formData.toString(),
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+    // Configurar headers com token de autenticação
+    getHeaders() {
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
         }
-      });
-      
-      if (data.access_token) {
+        
+        return headers;
+    }
+
+    // Atualizar token
+    setToken(token) {
+        this.token = token;
+        localStorage.setItem('token', token);
+    }
+
+    // Remover token (logout)
+    removeToken() {
+        this.token = null;
+        localStorage.removeItem('token');
+    }
+
+    // Função genérica para fazer requisições
+    async request(endpoint, options = {}) {
+        // Remove a barra inicial se existir para evitar duplicação
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+        const url = `${this.baseURL}/${normalizedEndpoint}`;
+        
+        const config = {
+            method: 'GET',
+            headers: this.getHeaders(),
+            ...options,
+            mode: 'cors', // Força o modo CORS
+            credentials: 'include', // Inclui credenciais se necessário
+        };
+
+        try {
+            const response = await fetch(url, config);
+            
+            if (!response.ok) {
+                let errorMessage = 'Erro na requisição';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.detail || JSON.stringify(errorData);
+                } catch (e) {
+                    errorMessage = await response.text();
+                }
+                
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.response = response;
+                throw error;
+            }
+
+            // Se a resposta for 204 (No Content), retorna null
+            if (response.status === 204) {
+                return null;
+            }
+
+            // Tenta fazer o parse da resposta como JSON
+            try {
+                return await response.json();
+            } catch (e) {
+                console.warn('Resposta não é um JSON válido:', e);
+                return await response.text();
+            }
+        } catch (error) {
+            console.error('Erro na requisição:', {
+                url,
+                error: error.message,
+                status: error.status,
+                response: error.response ? await error.response.text() : null
+            });
+            throw error;
+        }
+    }
+
+    // ===== AUTENTICAÇÃO =====
+    
+    async register(userData) {
+        return this.request('auth/register', {
+            method: 'POST',
+            body: JSON.stringify(userData),
+        });
+    }
+
+    async login(username, password) {
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('password', password);
+
+        // O endpoint de login espera 'x-www-form-urlencoded', então não usamos o header padrão
+        const data = await this.request('auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString(),
+        });
+
         this.setToken(data.access_token);
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('Login failed:', error);
-      this.removeToken();
-      throw error;
+        return data;
     }
-  }
 
-  // ===== AUTENTICAÇÃO =====
-  
-  async register(userData) {
-    return this.post('auth/register', userData);
-  }
+    async logout() {
+        this.removeToken();
+    }
 
-  async logout() {
-    this.removeToken();
-  }
+    async getCurrentUser() {
+        return this.request('auth/me');
+    }
 
-  async getCurrentUser() {
-    return this.get('auth/me');
-  }
-
-  // ===== CATEGORIAS =====
-  
-  async getCategories() {
-    return this.get('categories/');
-  }
-
-  async getCategory(id) {
-    return this.get(`categories/${id}`);
-  }
-
-  async createCategory(categoryData) {
-    return this.post('categories/', categoryData);
-  }
-
-  async updateCategory(id, categoryData) {
-    return this.put(`categories/${id}`, categoryData);
-  }
-
-  async deleteCategory(id) {
-    return this.delete(`categories/${id}`);
-  }
-
-  // ===== PRODUTOS =====
-  
-  async getProducts({ skip = 0, limit = 10, search = '', category_id } = {}) {
-    const params = new URLSearchParams();
-    if (skip) params.append('skip', skip);
-    if (limit) params.append('limit', limit);
-    if (search) params.append('search', search);
-    if (category_id) params.append('category_id', category_id);
+    // ===== CATEGORIAS =====
     
-    const queryString = params.toString();
-    const endpoint = `products/${queryString ? `?${queryString}` : ''}`;
+    async getCategories() {
+        return this.request('categories/');
+    }
+
+    async getCategory(id) {
+        return this.request(`categories/${id}`);
+    }
+
+    async createCategory(categoryData) {
+        return this.request('categories/', {
+            method: 'POST',
+            body: JSON.stringify(categoryData),
+        });
+    }
+
+    async updateCategory(id, categoryData) {
+        return this.request(`categories/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(categoryData),
+        });
+    }
+
+    async deleteCategory(id) {
+        return this.request(`categories/${id}`, {
+            method: 'DELETE',
+        });
+    }
+
+    // ===== PRODUTOS =====
     
-    const data = await this.get(endpoint);
+    async getProducts({ skip = 0, limit = 10, search = '', category_id } = {}) {
+        const params = new URLSearchParams();
+        if (skip) params.append('skip', skip);
+        if (limit) params.append('limit', limit);
+        if (search) params.append('search', search);
+        if (category_id) params.append('category_id', category_id);
+        
+        const queryString = params.toString();
+        const endpoint = `products/${queryString ? `?${queryString}` : ''}`;
+        
+        const data = await this.request(endpoint);
+        
+        // Mapear os campos do backend para o formato esperado pelo frontend
+        return data.map(product => ({
+            id: product.id,
+            name: product.nome,
+            description: product.descricao,
+            sku: product.codigo,
+            cost_price: parseFloat(product.preco_compra) || 0,
+            sale_price: parseFloat(product.preco_venda) || 0,
+            current_stock: product.estoque || 0,
+            min_stock: product.estoque_minimo || 0,
+            category_id: product.category_id,
+            venda_por_peso: product.venda_por_peso || false,
+            is_active: product.is_active !== false
+        }));
+    }
+
+    async getProduct(id) {
+        const product = await this.request(`products/${id}`);
+        
+        // Mapear os campos do backend para o formato esperado pelo frontend
+        return {
+            id: product.id,
+            name: product.nome,
+            description: product.descricao,
+            sku: product.codigo,
+            cost_price: parseFloat(product.preco_compra) || 0,
+            sale_price: parseFloat(product.preco_venda) || 0,
+            current_stock: product.estoque || 0,
+            min_stock: product.estoque_minimo || 0,
+            category_id: product.category_id,
+            venda_por_peso: product.venda_por_peso || false,
+            is_active: product.is_active !== false
+        };
+    }
+
+    async createProduct(productData) {
+        // Validate required fields
+        if (!productData.name) {
+            throw new Error('O nome do produto é obrigatório');
+        }
+        if (!productData.sku) {
+            throw new Error('O código SKU é obrigatório');
+        }
+        if (!productData.category_id) {
+            throw new Error('A categoria é obrigatória');
+        }
+
+        // Convert frontend format to backend format
+        const formattedData = {
+            codigo: productData.sku.toString().trim(),
+            category_id: parseInt(productData.category_id),
+            nome: productData.name.trim(),
+            descricao: productData.description ? productData.description.trim() : null,
+            preco_compra: parseFloat(productData.cost_price) || 0,
+            preco_venda: parseFloat(productData.sale_price) || 0,
+            estoque: parseInt(productData.current_stock) || 0,
+            estoque_minimo: parseInt(productData.min_stock) || 0,
+            venda_por_peso: Boolean(productData.venda_por_peso)
+        };
+
+        console.log('Enviando dados para a API:', JSON.stringify(formattedData, null, 2));
+
+        try {
+            const response = await this.request('products/', {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify(formattedData),
+            });
+            console.log('Resposta da API:', response);
+            return response;
+        } catch (error) {
+            console.error('Erro ao criar produto:', error);
+            throw new Error(`Falha ao criar produto: ${error.message}`);
+        }
+    }
+
+    async updateProduct(id, productData) {
+        // Validações iniciais
+        if (!id) {
+            throw new Error('ID do produto é obrigatório para atualização');
+        }
+        if (!productData) {
+            throw new Error('Dados do produto são obrigatórios');
+        }
+
+        // Validar campos obrigatórios
+        if (!productData.name) {
+            throw new Error('O nome do produto é obrigatório');
+        }
+        if (!productData.sku) {
+            throw new Error('O código SKU é obrigatório');
+        }
+        if (!productData.category_id) {
+            throw new Error('A categoria é obrigatória');
+        }
+
+        // Converter do formato do frontend para o formato do backend
+        const formattedData = {
+            codigo: productData.sku.toString().trim(),
+            category_id: parseInt(productData.category_id),
+            nome: productData.name.trim(),
+            descricao: productData.description ? productData.description.trim() : null,
+            preco_compra: parseFloat(productData.cost_price) || 0,
+            preco_venda: parseFloat(productData.sale_price) || 0,
+            estoque: parseInt(productData.current_stock) || 0,
+            estoque_minimo: parseInt(productData.min_stock) || 0,
+            venda_por_peso: Boolean(productData.venda_por_peso)
+        };
+
+        console.log('Enviando dados para atualização:', JSON.stringify({
+            id,
+            ...formattedData
+        }, null, 2));
+
+        try {
+            const response = await this.request(`products/${id}`, {
+                method: 'PUT',
+                headers: this.getHeaders(),
+                body: JSON.stringify(formattedData),
+            });
+            
+            console.log('Produto atualizado com sucesso:', response);
+            return response;
+            
+        } catch (error) {
+            console.error('Erro ao atualizar produto:', {
+                id,
+                error: error.message,
+                status: error.status,
+                response: error.response
+            });
+            throw new Error(`Falha ao atualizar produto: ${error.message}`);
+        }
+    }
+
+    async deleteProduct(id) {
+        // Validação do ID
+        if (!id) {
+            throw new Error('ID do produto é obrigatório para exclusão');
+        }
+
+        console.log(`Solicitando exclusão do produto com ID: ${id}`);
+
+        try {
+            const response = await this.request(`products/${id}`, {
+                method: 'DELETE',
+                headers: this.getHeaders()
+            });
+            
+            console.log('Produto excluído com sucesso:', response);
+            return response;
+            
+        } catch (error) {
+            console.error('Erro ao excluir produto:', {
+                id,
+                error: error.message,
+                status: error.status,
+                response: error.response
+            });
+            throw new Error(`Falha ao excluir produto: ${error.message}`);
+        }
+    }
+
+    async deleteAllProducts() {
+        return this.request('products/delete-all', {
+            method: 'DELETE',
+        });
+    }
+
+    // ===== FUNCIONÁRIOS =====
     
-    // Mapear os campos do backend para o formato esperado pelo frontend
-    return data.map(product => ({
-      id: product.id,
-      name: product.nome,
-      description: product.descricao,
-      sku: product.codigo,
-      cost_price: parseFloat(product.preco_compra) || 0,
-      sale_price: parseFloat(product.preco_venda) || 0,
-      current_stock: product.estoque || 0,
-      min_stock: product.estoque_minimo || 0,
-      category_id: product.category_id,
-      venda_por_peso: product.venda_por_peso || false,
-      is_active: product.is_active !== false
-    }));
-  }
+    /**
+     * Lista todos os funcionários com suporte a paginação
+     * @param {Object} params - Parâmetros de paginação
+     * @param {number} [params.page=1] - Número da página
+     * @param {number} [params.size=10] - Itens por página
+     * @returns {Promise<Object>} Lista de funcionários e metadados de paginação
+     */
+    async getEmployees({ page = 1, size = 10 } = {}) {
+        const query = new URLSearchParams({ page, size });
+        return this.request(`employees/?${query}`);
+    }
 
-  async getProduct(id) {
-    const product = await this.get(`products/${id}`);
+    /**
+     * Obtém os detalhes de um funcionário
+     * @param {number|string} id - ID do funcionário
+     * @returns {Promise<Object>} Dados do funcionário
+     */
+    async getEmployee(id) {
+        return this.request(`employees/${id}`);
+    }
+
+    /**
+     * Cria um novo funcionário
+     * @param {Object} employeeData - Dados do funcionário
+     * @param {string} employeeData.full_name - Nome completo
+     * @param {string} employeeData.username - Nome de usuário
+     * @param {string} employeeData.password - Senha
+     * @param {number} employeeData.salary - Salário
+     * @param {boolean} employeeData.is_admin - Se é administrador
+     * @param {boolean} employeeData.can_sell - Pode realizar vendas
+     * @param {boolean} employeeData.can_manage_inventory - Pode gerenciar estoque
+     * @param {boolean} employeeData.can_manage_expenses - Pode gerenciar despesas
+     * @returns {Promise<Object>} Dados do funcionário criado
+     */
+    async createEmployee(employeeData) {
+        return this.request('employees/', {
+            method: 'POST',
+            body: JSON.stringify(employeeData)
+        });
+    }
+
+    /**
+     * Atualiza um funcionário existente
+     * @param {number|string} id - ID do funcionário
+     * @param {Object} employeeData - Dados atualizados do funcionário
+     * @returns {Promise<Object>} Dados do funcionário atualizado
+     */
+    async updateEmployee(id, employeeData) {
+        return this.request(`employees/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(employeeData)
+        });
+    }
+
+    /**
+     * Remove um funcionário (soft delete)
+     * @param {number|string} id - ID do funcionário
+     * @returns {Promise<Object>} Resultado da operação
+     */
+    async deleteEmployee(id) {
+        return this.request(`employees/${id}`, {
+            method: 'DELETE'
+        });
+    }
+
+    // ===== VENDAS =====
     
-    // Mapear os campos do backend para o formato esperado pelo frontend
-    return {
-      id: product.id,
-      name: product.nome,
-      description: product.descricao,
-      sku: product.codigo,
-      cost_price: parseFloat(product.preco_compra) || 0,
-      sale_price: parseFloat(product.preco_venda) || 0,
-      current_stock: product.estoque || 0,
-      min_stock: product.estoque_minimo || 0,
-      category_id: product.category_id,
-      venda_por_peso: product.venda_por_peso || false,
-      is_active: product.is_active !== false
-    };
-  }
-
-  async createProduct(productData) {
-    // Validate required fields
-    if (!productData.name) {
-      throw new Error('O nome do produto é obrigatório');
-    }
-    if (!productData.sku) {
-      throw new Error('O código SKU é obrigatório');
-    }
-    if (!productData.category_id) {
-      throw new Error('A categoria é obrigatória');
+    async getSales() {
+        return this.request('sales/');
     }
 
-    // Convert frontend format to backend format
-    const formattedData = {
-      codigo: productData.sku.toString().trim(),
-      category_id: parseInt(productData.category_id),
-      nome: productData.name.trim(),
-      descricao: productData.description ? productData.description.trim() : null,
-      preco_compra: parseFloat(productData.cost_price) || 0,
-      preco_venda: parseFloat(productData.sale_price) || 0,
-      estoque: parseInt(productData.current_stock) || 0,
-      estoque_minimo: parseInt(productData.min_stock) || 0,
-      venda_por_peso: Boolean(productData.venda_por_peso)
-    };
-
-    console.log('Enviando dados para a API:', JSON.stringify(formattedData, null, 2));
-
-    try {
-      const response = await this.post('products/', formattedData);
-      console.log('Resposta da API:', response);
-      return response;
-    } catch (error) {
-      console.error('Erro ao criar produto:', error);
-      throw new Error(`Falha ao criar produto: ${error.message}`);
-    }
-  }
-
-  async updateProduct(id, productData) {
-    // Validações iniciais
-    if (!id) {
-      throw new Error('ID do produto é obrigatório para atualização');
-    }
-    if (!productData) {
-      throw new Error('Dados do produto são obrigatórios');
+    async getSale(id) {
+        return this.request(`sales/${id}`);
     }
 
-    // Validar campos obrigatórios
-    if (!productData.name) {
-      throw new Error('O nome do produto é obrigatório');
-    }
-    if (!productData.sku) {
-      throw new Error('O código SKU é obrigatório');
-    }
-    if (!productData.category_id) {
-      throw new Error('A categoria é obrigatória');
+    async createSale(saleData) {
+        // Remover referência ao cliente se existir
+        const { customer_id, ...saleDataSemCliente } = saleData;
+        return this.request('sales/', {
+            method: 'POST',
+            body: JSON.stringify(saleDataSemCliente),
+        });
     }
 
-    // Converter do formato do frontend para o formato do backend
-    const formattedData = {
-      codigo: productData.sku.toString().trim(),
-      category_id: parseInt(productData.category_id),
-      nome: productData.name.trim(),
-      descricao: productData.description ? productData.description.trim() : null,
-      preco_compra: parseFloat(productData.cost_price) || 0,
-      preco_venda: parseFloat(productData.sale_price) || 0,
-      estoque: parseInt(productData.current_stock) || 0,
-      estoque_minimo: parseInt(productData.min_stock) || 0,
-      venda_por_peso: Boolean(productData.venda_por_peso)
-    };
-
-    console.log('Enviando dados para atualização:', JSON.stringify({
-      id,
-      ...formattedData
-    }, null, 2));
-
-    try {
-      const response = await this.put(`products/${id}`, formattedData);
-      
-      console.log('Produto atualizado com sucesso:', response);
-      return response;
-      
-    } catch (error) {
-      console.error('Erro ao atualizar produto:', {
-        id,
-        error: error.message,
-        status: error.status,
-        response: error.response
-      });
-      throw new Error(`Falha ao atualizar produto: ${error.message}`);
-    }
-  }
-
-  async deleteProduct(id) {
-    // Validação do ID
-    if (!id) {
-      throw new Error('ID do produto é obrigatório para exclusão');
+    async updateSale(id, saleData) {
+        return this.request(`sales/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(saleData),
+        });
     }
 
-    console.log(`Solicitando exclusão do produto com ID: ${id}`);
-
-    try {
-      const response = await this.delete(`products/${id}`);
-      
-      console.log('Produto excluído com sucesso:', response);
-      return response;
-      
-    } catch (error) {
-      console.error('Erro ao excluir produto:', {
-        id,
-        error: error.message,
-        status: error.status,
-        response: error.response
-      });
-      throw new Error(`Falha ao excluir produto: ${error.message}`);
+    async deleteSale(id) {
+        return this.request(`sales/${id}`, {
+            method: 'DELETE',
+        });
     }
-  }
 
-  async deleteAllProducts() {
-    return this.delete('products/delete-all');
-  }
+    // ===== INVENTÁRIO =====
+    
+    async getInventoryMovements() {
+        return this.request('inventory/');
+    }
 
-  // ===== FUNCIONÁRIOS =====
-  
-  /**
-   * Lista todos os funcionários com suporte a paginação
-   * @param {Object} params - Parâmetros de paginação
-   * @param {number} [params.page=1] - Número da página
-   * @param {number} [params.size=10] - Itens por página
-   * @returns {Promise<Object>} Lista de funcionários e metadados de paginação
-   */
-  async getEmployees({ page = 1, size = 10 } = {}) {
-    const query = new URLSearchParams({ page, size });
-    return this.get(`employees/?${query}`);
-  }
+    async getInventoryMovement(id) {
+        return this.request(`inventory/${id}`);
+    }
 
-  /**
-   * Obtém os detalhes de um funcionário
-   * @param {number|string} id - ID do funcionário
-   * @returns {Promise<Object>} Dados do funcionário
-   */
-  async getEmployee(id) {
-    return this.get(`employees/${id}`);
-  }
+    async createInventoryMovement(movementData) {
+        return this.request('inventory/', {
+            method: 'POST',
+            body: JSON.stringify(movementData),
+        });
+    }
 
-  /**
-   * Cria um novo funcionário
-   * @param {Object} employeeData - Dados do funcionário
-   * @param {string} employeeData.full_name - Nome completo
-   * @param {string} employeeData.username - Nome de usuário
-   * @param {string} employeeData.password - Senha
-   * @param {number} employeeData.salary - Salário
-   * @param {boolean} employeeData.is_admin - Se é administrador
-   * @param {boolean} employeeData.can_sell - Pode realizar vendas
-   * @param {boolean} employeeData.can_manage_inventory - Pode gerenciar estoque
-   * @param {boolean} employeeData.can_manage_expenses - Pode gerenciar despesas
-   * @returns {Promise<Object>} Dados do funcionário criado
-   */
-  async createEmployee(employeeData) {
-    return this.post('employees/', employeeData);
-  }
+    // ===== USUÁRIOS =====
+    
+    async getUsers() {
+        return this.request('users/');
+    }
 
-  /**
-   * Atualiza um funcionário existente
-   * @param {number|string} id - ID do funcionário
-   * @param {Object} employeeData - Dados atualizados do funcionário
-   * @returns {Promise<Object>} Dados do funcionário atualizado
-   */
-  async updateEmployee(id, employeeData) {
-    return this.put(`employees/${id}`, employeeData);
-  }
+    async getUser(id) {
+        return this.request(`users/${id}`);
+    }
 
-  /**
-   * Remove um funcionário (soft delete)
-   * @param {number|string} id - ID do funcionário
-   * @returns {Promise<Object>} Resultado da operação
-   */
-  async deleteEmployee(id) {
-    return this.delete(`employees/${id}`);
-  }
+    async createUser(userData) {
+        return this.request('users/', {
+            method: 'POST',
+            body: JSON.stringify(userData),
+        });
+    }
 
-  // ===== VENDAS =====
-  
-  async getSales() {
-    return this.get('sales/');
-  }
+    async updateUser(id, userData) {
+        return this.request(`users/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(userData),
+        });
+    }
 
-  async getSale(id) {
-    return this.get(`sales/${id}`);
-  }
+    async deleteUser(id) {
+        return this.request(`users/${id}`, {
+            method: 'DELETE',
+        });
+    }
 
-  async createSale(saleData) {
-    // Remover referência ao cliente se existir
-    const { customer_id, ...saleDataSemCliente } = saleData;
-    return this.post('sales/', saleDataSemCliente);
-  }
-
-  async updateSale(id, saleData) {
-    return this.put(`sales/${id}`, saleData);
-  }
-
-  async deleteSale(id) {
-    return this.delete(`sales/${id}`);
-  }
-
-  // ===== INVENTÁRIO =====
-  
-  async getInventoryMovements() {
-    return this.get('inventory/');
-  }
-
-  async getInventoryMovement(id) {
-    return this.get(`inventory/${id}`);
-  }
-
-  async createInventoryMovement(movementData) {
-    return this.post('inventory/', movementData);
-  }
-
-  // ===== USUÁRIOS =====
-  
-  async getUsers() {
-    return this.get('users/');
-  }
-
-  async getUser(id) {
-    return this.get(`users/${id}`);
-  }
-
-  async createUser(userData) {
-    return this.post('users/', userData);
-  }
-
-  async updateUser(id, userData) {
-    return this.put(`users/${id}`, userData);
-  }
-
-  async deleteUser(id) {
-    return this.delete(`users/${id}`);
-  }
-
-  // ===== IMPRESSÃO =====
-  
-  async printReceipt(saleId) {
-    return this.post(`sales/${saleId}/print`);
-  }
+    // ===== IMPRESSÃO =====
+    
+    async printReceipt(saleId) {
+        return this.request(`sales/${saleId}/print`, {
+            method: 'POST',
+        });
+    }
 }
 
 // Instância global do serviço de API

@@ -1,7 +1,6 @@
 import apiService from './api';
 
-// Como a URL base já inclui /api/v1, definimos apenas os paths específicos
-const CART_ENDPOINT = 'cart';
+const CART_ENDPOINT = '/api/v1/cart';
 
 const cartService = {
   // Adicionar item ao carrinho
@@ -92,18 +91,26 @@ const cartService = {
   },
 
   // Finalizar compra/checkout
-  async checkout(paymentData) {
+  async checkout() {
     try {
-      // Usa o endpoint correto para checkout
-      const response = await apiService.post('cart/checkout', paymentData);
+      const response = await apiService.request('cart/checkout', {
+        method: 'POST',
+        body: {
+          payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
+          items: (await this.getCart()).items.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity
+          }))
+        }
+      });
       
-      // Limpa o carrinho após o checkout bem-sucedido
+      // Clear cart after successful checkout
       await this.clearCart();
       
       return response;
     } catch (error) {
-      console.error('Erro ao finalizar compra:', error);
-      throw new Error(error.data?.message || 'Erro ao processar o pagamento');
+      console.error('Erro ao finalizar venda:', error);
+      throw error;
     }
   }
 };
