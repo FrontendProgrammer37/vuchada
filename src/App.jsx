@@ -37,133 +37,118 @@ const AppContent = () => {
   const { isAuthenticated } = useAuth();
 
   return (
-    <>
-      <Routes>
-        <Route 
-          path="/login" 
-          element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
-          } 
-        />
-        <Route 
-          path="/" 
-          element={
-            <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
-          } 
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/produtos"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Produtos />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/funcionarios"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Funcionarios />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/relatorios"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Relatorios />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendas"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <TodasVendas />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pdv"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PDV />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pdv"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PDV />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/configuracoes"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Configuracoes />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="*"
-          element={
-            <Navigate to="/dashboard" replace />
-          }
-        />
-      </Routes>
-      <ToastContainer 
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
+    <Routes>
+      <Route 
+        path="/login" 
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+        } 
       />
-    </>
+      <Route 
+        path="/" 
+        element={
+          <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
+        } 
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/produtos"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Produtos />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/funcionarios"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Funcionarios />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/relatorios"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Relatorios />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendas"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TodasVendas />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pdv"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <PDV />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pdv"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <PDV />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/configuracoes"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Configuracoes />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="*"
+        element={
+          <Navigate to="/dashboard" replace />
+        }
+      />
+    </Routes>
   );
 };
 
 // Componente principal App
 const App = () => {
   return (
-    <Router>
-      <AuthProvider>
-        <CartProvider>
-          <AppContent />
-        </CartProvider>
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <ToastContainer position="top-right" autoClose={5000} />
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 };
 

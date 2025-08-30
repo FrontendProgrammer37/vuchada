@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import cartService from '../services/cartService';
-import api from '../services/api';
 
 const CartContext = createContext();
 
@@ -14,29 +13,9 @@ export const CartProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [sessionId, setSessionId] = useState(localStorage.getItem('sessionId'));
-
-  // Initialize session ID if not exists
-  useEffect(() => {
-    if (!sessionId) {
-      const newSessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('sessionId', newSessionId);
-      setSessionId(newSessionId);
-    }
-  }, [sessionId]);
-
-  // Update API service with current session ID
-  useEffect(() => {
-    if (sessionId) {
-      // The session ID is now automatically handled by the API service
-      loadCart();
-    }
-  }, [sessionId]);
 
   // Carregar carrinho do servidor
   const loadCart = async () => {
-    if (!sessionId) return;
-    
     try {
       setLoading(true);
       const cartData = await cartService.getCart();
@@ -62,8 +41,6 @@ export const CartProvider = ({ children }) => {
 
   // Adicionar item ao carrinho
   const addToCart = async (productId, quantity = 1) => {
-    if (!sessionId) return;
-    
     try {
       setLoading(true);
       await cartService.addItem(productId, quantity);
@@ -78,8 +55,6 @@ export const CartProvider = ({ children }) => {
 
   // Atualizar quantidade de um item
   const updateItemQuantity = async (productId, newQuantity) => {
-    if (!sessionId) return;
-    
     try {
       if (newQuantity <= 0) {
         await removeFromCart(productId);
@@ -99,8 +74,6 @@ export const CartProvider = ({ children }) => {
 
   // Remover item do carrinho
   const removeFromCart = async (productId) => {
-    if (!sessionId) return;
-    
     try {
       setLoading(true);
       await cartService.removeItem(productId);
@@ -115,8 +88,6 @@ export const CartProvider = ({ children }) => {
 
   // Limpar carrinho
   const clearCart = async () => {
-    if (!sessionId) return;
-    
     try {
       setLoading(true);
       await cartService.clearCart();
@@ -130,27 +101,12 @@ export const CartProvider = ({ children }) => {
   };
 
   // Finalizar compra
-  const checkout = async (paymentMethod, amountReceived = 0) => {
-    if (!sessionId) return null;
-    
+  const checkout = async (paymentMethod, customerId = null, notes = '') => {
     try {
       setLoading(true);
-      const saleData = {
-        items: cart.items.map(item => ({
-          product_id: item.product_id || item.id,
-          quantity: item.quantity,
-          unit_price: item.price || item.unit_price,
-          total_price: (item.price || item.unit_price) * item.quantity
-        })),
-        payment_method: paymentMethod,
-        amount_received: parseFloat(amountReceived) || cart.total,
-        total_amount: cart.total,
-        change: parseFloat(amountReceived) - cart.total
-      };
-      
-      // Clear cart on successful checkout
-      await clearCart();
-      return saleData;
+      const result = await cartService.checkout(paymentMethod, customerId, notes);
+      await clearCart(); // Limpa o carrinho após finalizar a compra
+      return result;
     } catch (err) {
       setError(err.message || 'Erro ao finalizar compra');
       throw err;
@@ -158,6 +114,22 @@ export const CartProvider = ({ children }) => {
       setLoading(false);
     }
   };
+
+  // Verificar se um produto está no carrinho
+  const isInCart = (productId) => {
+    return cart.items.some(item => item.product_id === productId);
+  };
+
+  // Obter quantidade de um item no carrinho
+  const getItemQuantity = (productId) => {
+    const item = cart.items.find(item => item.product_id === productId);
+    return item ? item.quantity : 0;
+  };
+
+  // Carregar carrinho ao montar o componente
+  useEffect(() => {
+    loadCart();
+  }, []);
 
   return (
     <CartContext.Provider
@@ -170,7 +142,9 @@ export const CartProvider = ({ children }) => {
         removeFromCart,
         clearCart,
         checkout,
-        reloadCart: loadCart
+        isInCart,
+        getItemQuantity,
+        loadCart
       }}
     >
       {children}
