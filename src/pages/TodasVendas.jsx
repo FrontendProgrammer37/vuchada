@@ -168,7 +168,7 @@ const TodasVendas = () => {
               {itens.map((item, index) => (
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {item.product?.name || 'Produto não encontrado'}
+                    {item['product.nome'] || 'Produto não encontrado'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {item.quantity}
