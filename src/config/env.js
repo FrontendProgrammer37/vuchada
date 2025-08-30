@@ -3,11 +3,11 @@
 const ENV = {
   development: {
     // No desenvolvimento, usamos o proxy configurado no Vite
-    API_URL: 'http://localhost:5173/api',
+    API_URL: 'http://localhost:5173',
   },
   production: {
-    // Em produção, usamos a URL direta da API
-    API_URL: 'https://backend-production-f01c.up.railway.app/api/v1',
+    // Em produção, usamos a URL direta da API com HTTPS
+    API_URL: 'https://backend-production-f01c.up.railway.app',
   },
 };
 

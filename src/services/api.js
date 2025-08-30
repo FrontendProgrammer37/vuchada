@@ -36,7 +36,21 @@ class ApiService {
     async request(endpoint, options = {}) {
         // Remove a barra inicial se existir para evitar duplicação
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        const url = `${this.baseURL}/${normalizedEndpoint}`;
+        
+        // Garante que a URL base termine com /api/v1
+        let baseUrl = this.baseURL;
+        if (!baseUrl.endsWith('/api/v1')) {
+            baseUrl = baseUrl.endsWith('/') 
+                ? `${baseUrl}api/v1` 
+                : `${baseUrl}/api/v1`;
+        }
+        
+        // Garante que a URL use HTTPS em produção
+        if (process.env.NODE_ENV === 'production' && baseUrl.startsWith('http://')) {
+            baseUrl = baseUrl.replace('http://', 'https://');
+        }
+        
+        const url = `${baseUrl}/${normalizedEndpoint}`;
         
         const config = {
             method: 'GET',
