@@ -184,9 +184,9 @@ class ApiService {
                     id: response.id || response.user_id,
                     username: response.username,
                     email: response.email,
-                    full_name: response.full_name,
+                    full_name: response.full_name || response.username,
                     role: response.role || 'user',
-                    is_admin: response.is_admin || false,
+                    is_admin: response.is_admin || response.role === 'admin',
                     permissions: response.permissions || []
                 };
                 
@@ -203,8 +203,10 @@ class ApiService {
             if (error.status === 401) {
                 this.removeToken();
                 localStorage.removeItem('user');
+                // Não lança o erro para não quebrar o fluxo de login
+                return null;
             }
-            throw new Error('Não foi possível carregar os dados do usuário');
+            throw error;
         }
     }
 

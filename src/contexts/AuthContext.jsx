@@ -69,13 +69,23 @@ export const AuthProvider = ({ children }) => {
             setLoading(true);
             setError(null);
             
-            const response = await apiService.login(username, password);
+            // Faz o login e obtém o token
+            const loginResponse = await apiService.login(username, password);
             
-            // Se chegou aqui, o login foi bem-sucedido
-            const userData = response.user || await apiService.getCurrentUser();
+            // Tenta obter os dados do usuário
+            let userData = loginResponse.user;
+            
+            if (!userData) {
+                userData = await apiService.getCurrentUser();
+            }
+            
+            if (!userData) {
+                throw new Error('Não foi possível carregar os dados do usuário');
+            }
+            
             setUser(userData);
-            
             return userData;
+            
         } catch (error) {
             console.error('Erro no login:', error);
             
@@ -83,7 +93,7 @@ export const AuthProvider = ({ children }) => {
             let errorMessage = 'Erro ao fazer login';
             if (error.message.includes('Failed to fetch')) {
                 errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão com a internet.';
-            } else if (error.message.includes('401')) {
+            } else if (error.status === 401 || error.message.includes('401') || error.message.includes('credenciais')) {
                 errorMessage = 'Usuário ou senha inválidos';
             } else if (error.message) {
                 errorMessage = error.message;
