@@ -1,71 +1,86 @@
 import api from './api';
 
+const SALE_ENDPOINT = 'sales';
+
 const salesService = {
-  // Criar uma nova venda
+  // Create a new sale
   async createSale(saleData) {
     try {
-      const response = await api.post('/sales/', saleData);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao criar venda:', error);
-      throw error;
-    }
-  },
-
-  // Obter detalhes de uma venda específica
-  async getSale(saleId) {
-    try {
-      const response = await api.get(`/sales/${saleId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Erro ao buscar venda ${saleId}:`, error);
-      throw error;
-    }
-  },
-
-  // Listar todas as vendas (com opções de paginação e filtro)
-  async listSales(page = 1, limit = 10, filters = {}) {
-    try {
-      const params = new URLSearchParams({
-        page,
-        limit,
-        ...filters
+      const response = await api.request(SALE_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({
+          items: saleData.items.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price
+          })),
+          payment_method: saleData.payment_method,
+          amount_received: saleData.amount_received,
+          total_amount: saleData.total_amount,
+          change: saleData.change || 0
+        })
       });
-      
-      const response = await api.get(`/sales?${params.toString()}`);
-      return response.data;
+      return response;
     } catch (error) {
-      console.error('Erro ao listar vendas:', error);
+      console.error('Error creating sale:', error);
       throw error;
     }
   },
 
-  // Cancelar uma venda
-  async cancelSale(saleId, reason) {
+  // Get sale by ID
+  async getSale(id) {
     try {
-      const response = await api.post(`/sales/${saleId}/cancel`, { reason });
-      return response.data;
+      return await api.request(`${SALE_ENDPOINT}/${id}`);
     } catch (error) {
-      console.error(`Erro ao cancelar venda ${saleId}:`, error);
+      console.error(`Error fetching sale ${id}:`, error);
       throw error;
     }
   },
 
-  // Obter métodos de pagamento disponíveis
-  getPaymentMethods() {
-    return [
-      { value: 'DINHEIRO', label: 'Dinheiro' },
-      { value: 'MPESA', label: 'M-Pesa' },
-      { value: 'EMOLA', label: 'Emola' },
-      { value: 'CARTAO_POS', label: 'Cartão P.O.S' },
-      { value: 'TRANSFERENCIA', label: 'Transferência' },
-      { value: 'MILLENNIUM', label: 'Millennium Bank' },
-      { value: 'BCI', label: 'BCI' },
-      { value: 'STANDARD_BANK', label: 'Standard Bank' },
-      { value: 'ABSA_BANK', label: 'ABSA Bank' },
-      { value: 'LETSHEGO', label: 'Letshego' },
-      { value: 'MYBUCKS', label: 'MyBucks' }
-    ];
+  // Get all sales with optional filters
+  async getSales({ page = 1, limit = 10, startDate, endDate } = {}) {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('limit', limit);
+      if (startDate) params.append('start_date', startDate);
+      if (endDate) params.append('end_date', endDate);
+      
+      return await api.request(`${SALE_ENDPOINT}?${params.toString()}`);
+    } catch (error) {
+      console.error('Error fetching sales:', error);
+      throw error;
+    }
+  },
+
+  // Cancel a sale
+  async cancelSale(id, reason = '') {
+    try {
+      return await api.request(`${SALE_ENDPOINT}/${id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      });
+    } catch (error) {
+      console.error(`Error cancelling sale ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Get available payment methods
+  async getPaymentMethods() {
+    try {
+      return [
+        { value: 'dinheiro', label: 'Dinheiro' },
+        { value: 'mbway', label: 'MB Way' },
+        { value: 'multibanco', label: 'Multibanco' },
+        { value: 'visa', label: 'Cartão Visa' },
+        { value: 'mastercard', label: 'Cartão Mastercard' }
+      ];
+    } catch (error) {
+      console.error('Error getting payment methods:', error);
+      throw error;
+    }
   }
 };
 

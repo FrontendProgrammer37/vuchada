@@ -5,12 +5,24 @@ class ApiService {
     constructor() {
         this.baseURL = config.API_URL; // Já inclui /api/v1 no ambiente de produção
         this.token = localStorage.getItem('token');
+        this.sessionId = this.generateSessionId();
     }
 
-    // Configurar headers com token de autenticação
+    // Generate a unique session ID
+    generateSessionId() {
+        let sessionId = localStorage.getItem('sessionId');
+        if (!sessionId) {
+            sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('sessionId', sessionId);
+        }
+        return sessionId;
+    }
+
+    // Configurar headers com token de autenticação e session ID
     getHeaders() {
         const headers = {
             'Content-Type': 'application/json',
+            'X-Session-ID': this.sessionId
         };
         
         if (this.token) {
@@ -30,6 +42,9 @@ class ApiService {
     removeToken() {
         this.token = null;
         localStorage.removeItem('token');
+        // Clear session ID on logout
+        localStorage.removeItem('sessionId');
+        this.sessionId = this.generateSessionId();
     }
 
     // Função genérica para fazer requisições
@@ -42,47 +57,38 @@ class ApiService {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+            mode: 'cors',
+            credentials: 'include',
         };
 
         try {
             const response = await fetch(url, config);
             
-            if (!response.ok) {
-                let errorMessage = 'Erro na requisição';
-                try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.detail || JSON.stringify(errorData);
-                } catch (e) {
-                    errorMessage = await response.text();
-                }
-                
-                const error = new Error(errorMessage);
-                error.status = response.status;
-                error.response = response;
-                throw error;
-            }
-
-            // Se a resposta for 204 (No Content), retorna null
-            if (response.status === 204) {
-                return null;
-            }
-
-            // Tenta fazer o parse da resposta como JSON
+            // Clone the response to avoid consuming the stream
+            const responseClone = response.clone();
+            
+            // Try to parse as JSON, fall back to text if not JSON
             try {
-                return await response.json();
-            } catch (e) {
-                console.warn('Resposta não é um JSON válido:', e);
-                return await response.text();
+                const data = await response.json();
+                if (!response.ok) {
+                    const error = new Error(data.detail || 'Request failed');
+                    error.status = response.status;
+                    error.data = data;
+                    throw error;
+                }
+                return data;
+            } catch (jsonError) {
+                // If JSON parsing fails, try to get the response as text
+                const text = await responseClone.text();
+                if (!response.ok) {
+                    const error = new Error(text || 'Request failed');
+                    error.status = response.status;
+                    throw error;
+                }
+                return text;
             }
         } catch (error) {
-            console.error('Erro na requisição:', {
-                url,
-                error: error.message,
-                status: error.status,
-                response: error.response ? await error.response.text() : null
-            });
+            console.error('API Request Error:', error);
             throw error;
         }
     }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
-import apiService from '../services/api';
+import saleService from '../services/saleService';
+import cartService from '../services/cartService';
+import productService from '../services/productService';
 import toast from '../utils/toast';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -19,7 +21,7 @@ const PDV = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getProducts({ limit: 1000 }); // Get all products
+        const data = await productService.getProducts({ limit: 1000 }); // Get all products
         setProducts(data);
       } catch (err) {
         setError('Erro ao carregar produtos');
@@ -143,14 +145,15 @@ const PDV = () => {
           total_price: item.total
         })),
         payment_method: paymentMethod,
-        total_amount: cartTotal,
         amount_received: paymentMethod === 'dinheiro' ? parseFloat(amountReceived) : cartTotal,
+        total_amount: cartTotal,
         change: paymentMethod === 'dinheiro' ? change : 0
       };
 
-      await apiService.createSale(saleData);
+      await saleService.createSale(saleData);
       
-      // Reset form
+      // Clear cart and reset form
+      await cartService.clearCart();
       setCart([]);
       setAmountReceived('');
       setPaymentMethod('dinheiro');
@@ -158,12 +161,12 @@ const PDV = () => {
       toast.success('Venda realizada com sucesso!');
       
       // Refresh product list to update stock
-      const updatedProducts = await apiService.getProducts({ limit: 1000 });
+      const updatedProducts = await productService.getProducts({ limit: 1000 });
       setProducts(updatedProducts);
       
     } catch (error) {
       console.error('Error creating sale:', error);
-      toast.error('Erro ao processar venda. Tente novamente.');
+      toast.error(error.message || 'Erro ao processar venda. Tente novamente.');
     }
   };
 
@@ -185,6 +188,14 @@ const PDV = () => {
     const inCart = cart.find(item => item.id === productId)?.quantity || 0;
     return Math.max(0, product.current_stock - inCart);
   };
+
+  const paymentMethods = [
+    { value: 'dinheiro', label: 'Dinheiro' },
+    { value: 'mbway', label: 'MB Way' },
+    { value: 'multibanco', label: 'Multibanco' },
+    { value: 'visa', label: 'Cartão Visa' },
+    { value: 'mastercard', label: 'Cartão Mastercard' }
+  ];
 
   if (loading) {
     return (
@@ -373,11 +384,11 @@ const PDV = () => {
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                   >
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="mbway">MB Way</option>
-                    <option value="multibanco">Multibanco</option>
-                    <option value="visa">Cartão Visa</option>
-                    <option value="mastercard">Cartão Mastercard</option>
+                    {paymentMethods.map(method => (
+                      <option key={method.value} value={method.value}>
+                        {method.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

@@ -8,10 +8,10 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/add`, {
         method: 'POST',
-        body: {
+        body: JSON.stringify({
           product_id: productId,
-          quantity: quantity
-        }
+          quantity: parseInt(quantity, 10)
+        })
       });
       return response;
     } catch (error) {
@@ -21,9 +21,9 @@ const cartService = {
   },
 
   // Obter carrinho atual
-  async getCart() {
+  async getCart(sessionId) {
     try {
-      const response = await apiService.request(CART_ENDPOINT);
+      const response = await apiService.request(`${CART_ENDPOINT}/${sessionId}`);
       return response;
     } catch (error) {
       // Se o carrinho não existir, retorna um carrinho vazio
@@ -36,14 +36,13 @@ const cartService = {
   },
 
   // Atualizar quantidade de um item
-  async updateItemQuantity(productId, quantity) {
+  async updateItemQuantity(productId, quantity, sessionId) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/update`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/${sessionId}/${productId}`, {
         method: 'PUT',
-        body: {
-          product_id: productId,
-          quantity: quantity
-        }
+        body: JSON.stringify({
+          quantity: parseInt(quantity, 10)
+        })
       });
       return response;
     } catch (error) {
@@ -53,11 +52,10 @@ const cartService = {
   },
 
   // Remover item do carrinho
-  async removeItem(productId) {
+  async removeItem(productId, sessionId) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
-        method: 'DELETE',
-        body: { product_id: productId }
+      const response = await apiService.request(`${CART_ENDPOINT}/${sessionId}/${productId}`, {
+        method: 'DELETE'
       });
       return response;
     } catch (error) {
@@ -67,9 +65,9 @@ const cartService = {
   },
 
   // Limpar carrinho
-  async clearCart() {
+  async clearCart(sessionId) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/clear`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/${sessionId}`, {
         method: 'DELETE'
       });
       return response;
@@ -91,13 +89,13 @@ const cartService = {
   },
 
   // Finalizar compra/checkout
-  async checkout() {
+  async checkout(sessionId) {
     try {
-      const response = await apiService.request('cart/checkout', {
+      const response = await apiService.request(`cart/checkout/${sessionId}`, {
         method: 'POST',
         body: {
           payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
-          items: (await this.getCart()).items.map(item => ({
+          items: (await this.getCart(sessionId)).items.map(item => ({
             product_id: item.id,
             quantity: item.quantity
           }))
@@ -105,7 +103,7 @@ const cartService = {
       });
       
       // Clear cart after successful checkout
-      await this.clearCart();
+      await this.clearCart(sessionId);
       
       return response;
     } catch (error) {
