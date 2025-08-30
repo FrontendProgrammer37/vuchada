@@ -70,12 +70,27 @@ export const AuthProvider = ({ children }) => {
             setError(null);
             
             const response = await apiService.login(username, password);
-            setUser(response.user || response);
-            return response;
+            
+            // Se chegou aqui, o login foi bem-sucedido
+            const userData = response.user || await apiService.getCurrentUser();
+            setUser(userData);
+            
+            return userData;
         } catch (error) {
             console.error('Erro no login:', error);
-            setError(error.message || 'Erro ao fazer login');
-            throw error;
+            
+            // Mensagens de erro mais amigáveis
+            let errorMessage = 'Erro ao fazer login';
+            if (error.message.includes('Failed to fetch')) {
+                errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão com a internet.';
+            } else if (error.message.includes('401')) {
+                errorMessage = 'Usuário ou senha inválidos';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            setError(errorMessage);
+            throw new Error(errorMessage);
         } finally {
             setLoading(false);
         }

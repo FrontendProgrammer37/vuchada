@@ -128,6 +128,7 @@ class ApiService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
                 },
                 body: formData.toString(),
             });
@@ -135,35 +136,75 @@ class ApiService {
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.detail || 'Falha no login');
+                // Se o servidor retornar um erro 401, lança uma mensagem mais amigável
+                if (response.status === 401) {
+                    throw new Error('Usuário ou senha inválidos');
+                }
+                throw new Error(data.detail || 'Falha no login. Por favor, tente novamente.');
+            }
+
+            if (!data.access_token) {
+                throw new Error('Token de acesso não recebido do servidor');
             }
 
             this.setToken(data.access_token);
-            // Salva os dados do usuário no localStorage
-            if (data.user) {
+            
+            // Tenta obter os dados do usuário se não estiverem na resposta
+            if (!data.user) {
+                try {
+                    const userData = await this.getCurrentUser();
+                    data.user = userData;
+                    localStorage.setItem('user', JSON.stringify(userData));
+                } catch (userError) {
+                    console.warn('Não foi possível obter os dados do usuário:', userError);
+                }
+            } else {
                 localStorage.setItem('user', JSON.stringify(data.user));
             }
             
             return data;
         } catch (error) {
             console.error('Erro no login:', error);
+            // Melhora a mensagem de erro para o usuário
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet.');
+            }
             throw error;
         }
     }
 
     async getCurrentUser() {
         try {
-            const user = await this.request('auth/me');
-            if (user) {
-                localStorage.setItem('user', JSON.stringify(user));
+            const response = await this.request('auth/me');
+            
+            // Se a resposta contiver os dados do usuário, retorna
+            if (response && (response.id || response.user_id)) {
+                // Garante que o objeto de usuário tenha um formato consistente
+                const userData = {
+                    id: response.id || response.user_id,
+                    username: response.username,
+                    email: response.email,
+                    full_name: response.full_name,
+                    role: response.role || 'user',
+                    is_admin: response.is_admin || false,
+                    permissions: response.permissions || []
+                };
+                
+                // Atualiza o usuário no localStorage
+                localStorage.setItem('user', JSON.stringify(userData));
+                
+                return userData;
             }
-            return user;
+            
+            throw new Error('Dados do usuário inválidos');
         } catch (error) {
+            console.error('Erro ao obter dados do usuário:', error);
+            // Limpa o token se não for mais válido
             if (error.status === 401) {
                 this.removeToken();
                 localStorage.removeItem('user');
             }
-            throw error;
+            throw new Error('Não foi possível carregar os dados do usuário');
         }
     }
 
