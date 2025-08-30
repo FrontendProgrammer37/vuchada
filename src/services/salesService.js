@@ -26,17 +26,38 @@ const salesService = {
   // Listar todas as vendas (com opções de paginação e filtro)
   async listSales(page = 1, limit = 10, filters = {}) {
     try {
+      // Constrói os parâmetros da URL
       const params = new URLSearchParams({
         page,
         limit,
         ...filters
       });
       
-      const response = await api.get(`/sales?${params.toString()}`);
-      return response.data;
+      // Remove parâmetros undefined
+      Array.from(params.entries()).forEach(([key, value]) => {
+        if (value === undefined || value === '') {
+          params.delete(key);
+        }
+      });
+
+      const response = await api.request(`sales?${params.toString()}`);
+      
+      // Se a resposta for um array, retorna diretamente
+      if (Array.isArray(response)) {
+        return response;
+      }
+      
+      // Se a resposta tiver uma propriedade 'items', retorna ela
+      if (response && response.items) {
+        return response.items;
+      }
+      
+      // Se não encontrar os itens, retorna um array vazio
+      return [];
     } catch (error) {
       console.error('Erro ao listar vendas:', error);
-      throw error;
+      // Retorna um array vazio em caso de erro para não quebrar a UI
+      return [];
     }
   },
 
