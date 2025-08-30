@@ -56,8 +56,8 @@ class ApiService {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+            mode: 'cors',
+            credentials: 'include',
         };
 
         // Se o body for um objeto, converte para JSON
@@ -72,9 +72,6 @@ class ApiService {
         try {
             const response = await fetch(url, config);
             
-            // Clona a resposta para podermos lê-la mais de uma vez se necessário
-            const responseClone = response.clone();
-            
             // Se a resposta for 204 (No Content), retorna null
             if (response.status === 204) {
                 return null;
@@ -82,12 +79,10 @@ class ApiService {
 
             // Tenta fazer o parse da resposta como JSON
             try {
-                const data = await response.json();
-                // Se a resposta não for bem sucedida, lança um erro
+                const data = await response.clone().json();
                 if (!response.ok) {
                     const error = new Error(data.detail || 'Erro na requisição');
                     error.status = response.status;
-                    error.response = responseClone;
                     error.data = data;
                     throw error;
                 }
@@ -95,13 +90,13 @@ class ApiService {
             } catch (jsonError) {
                 // Se não for JSON, tenta ler como texto
                 if (!response.ok) {
-                    const text = await response.text();
+                    const text = await response.clone().text();
                     const error = new Error(text || 'Erro na requisição');
                     error.status = response.status;
-                    error.response = responseClone;
+                    error.data = text;
                     throw error;
                 }
-                // Se for sucesso mas não for JSON, retorna o texto
+                // Se a resposta for bem sucedida mas não for JSON, retorna o texto
                 return await response.text();
             }
         } catch (error) {
@@ -109,6 +104,7 @@ class ApiService {
                 url,
                 error: error.message,
                 status: error.status,
+                response: error.response
             });
             throw error;
         }
