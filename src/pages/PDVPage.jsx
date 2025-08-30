@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Minus, X, Check, ShoppingCart } from 'lucide-react';
 import apiService from '../services/api';
-import cartService from '../services/cart'; // Import the cartService
+import cartService from '../services/cartService'; // Import the cartService
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
