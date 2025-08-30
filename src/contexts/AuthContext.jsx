@@ -84,12 +84,26 @@ export const AuthProvider = ({ children }) => {
     // Logout
     const logout = async () => {
         try {
-            await apiService.logout();
-        } catch (error) {
-            console.error('Erro ao fazer logout:', error);
-        } finally {
+            // Clear user state first to prevent any UI flicker
             setUser(null);
             setError(null);
+            
+            // Call the API logout - don't await it to prevent blocking
+            apiService.logout().catch(error => {
+                console.warn('Warning during logout:', error);
+            });
+            
+            // Clear any local storage data
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            
+        } catch (error) {
+            console.error('Erro ao fazer logout:', error);
+            // Even if there's an error, we still want to clear the local state
+            setUser(null);
+            setError(null);
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
         }
     };
 

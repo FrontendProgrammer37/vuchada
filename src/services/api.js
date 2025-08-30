@@ -147,12 +147,22 @@ class ApiService {
 
     async logout() {
         try {
-            await this.request('auth/logout', { method: 'POST' });
+            // Try to call the logout endpoint, but don't wait for it to complete
+            // as the server might not respond if the session is already invalidated
+            this.request('auth/logout', { 
+                method: 'POST',
+                // Don't wait for response to avoid stream reading issues
+                signal: AbortSignal.timeout(1000) 
+            }).catch(console.warn);
         } catch (error) {
             console.warn('Erro ao fazer logout no servidor:', error);
         } finally {
+            // Always remove tokens and user data from client-side
             this.removeToken();
             localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            // Clear any other session-related data if needed
+            // e.g., cart items, preferences, etc.
         }
     }
 
