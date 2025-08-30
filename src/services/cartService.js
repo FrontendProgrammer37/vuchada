@@ -94,14 +94,16 @@ const cartService = {
   // Finalizar compra/checkout
   async checkout(paymentData) {
     try {
-      const response = await apiService.request('checkout', {
-        method: 'POST',
-        body: paymentData
-      });
+      // Usa o endpoint correto para checkout
+      const response = await apiService.post('cart/checkout', paymentData);
+      
+      // Limpa o carrinho após o checkout bem-sucedido
+      await this.clearCart();
+      
       return response;
     } catch (error) {
       console.error('Erro ao finalizar compra:', error);
-      throw error;
+      throw new Error(error.data?.message || 'Erro ao processar o pagamento');
     }
   }
 };

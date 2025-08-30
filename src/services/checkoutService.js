@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CHECKOUT_ENDPOINT = 'sales/checkout';
+const CHECKOUT_ENDPOINT = 'cart/checkout';
 
 const checkoutService = {
   /**
@@ -15,19 +15,32 @@ const checkoutService = {
    */
   async processCheckout(checkoutData) {
     try {
+      // Formata os itens para o formato esperado pelo backend
+      const items = (checkoutData.items || []).map(item => ({
+        product_id: item.product_id || item.id,
+        quantity: item.quantity || 1,
+        price: item.price || 0,
+        name: item.name || 'Produto sem nome'
+      }));
+
       const payload = {
-        payment_method: checkoutData.payment_method,
-        amount_received: checkoutData.amount_received || 0,
+        payment_method: checkoutData.payment_method || 'DINHEIRO',
+        amount_received: parseFloat(checkoutData.amount_received) || 0,
         notes: checkoutData.notes || '',
         customer_id: checkoutData.customer_id || null,
-        items: checkoutData.items || []
+        items: items,
+        status: 'completed' // Garante que a venda seja marcada como concluída
       };
 
+      console.log('Enviando dados para checkout:', payload);
       const response = await apiService.post(CHECKOUT_ENDPOINT, payload);
+      console.log('Resposta do checkout:', response);
+      
       return response;
     } catch (error) {
       console.error('Erro ao processar checkout:', error);
-      throw new Error(error.message || 'Erro ao processar o pagamento');
+      const errorMessage = error.data?.message || error.message || 'Erro ao processar o pagamento';
+      throw new Error(errorMessage);
     }
   },
 
