@@ -13,6 +13,66 @@ export const CartProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [weightInput, setWeightInput] = useState({
+    isOpen: false,
+    product: null,
+    initialWeight: '0.100',
+    isEditing: false
+  });
+
+  // Format weight for display (e.g., 1.500 kg)
+  const formatWeight = (weight) => {
+    const value = parseFloat(weight);
+    return isNaN(value) ? '0.000 kg' : `${value.toFixed(3).replace(/\.?0+$/, '')} kg`;
+  };
+
+  // Calculate price for weight-based items
+  const calculateWeightedPrice = (item) => {
+    if (!item.is_weight_based) return item.price * item.quantity;
+    return item.price * item.quantity; // price is per kg, quantity is in kg
+  };
+
+  // Open weight input dialog
+  const openWeightInput = (product, isEditing = false, initialWeight = '0.100') => {
+    setWeightInput({
+      isOpen: true,
+      product,
+      initialWeight,
+      isEditing
+    });
+  };
+
+  // Close weight input dialog
+  const closeWeightInput = () => {
+    setWeightInput({
+      isOpen: false,
+      product: null,
+      initialWeight: '0.100',
+      isEditing: false
+    });
+  };
+
+  // Handle weight confirmation
+  const handleWeightConfirm = async (weight) => {
+    if (!weightInput.product) return;
+    
+    try {
+      setLoading(true);
+      const { product, isEditing } = weightInput;
+      
+      if (isEditing) {
+        await updateItemQuantity(product.id, weight);
+      } else {
+        await addToCart(product.id, weight, product.is_weight_based);
+      }
+    } catch (err) {
+      setError(err.message || 'Erro ao processar item por peso');
+      throw err;
+    } finally {
+      setLoading(false);
+      closeWeightInput();
+    }
+  };
 
   // Carregar carrinho do servidor
   const loadCart = async () => {
@@ -40,10 +100,11 @@ export const CartProvider = ({ children }) => {
   };
 
   // Adicionar item ao carrinho
-  const addToCart = async (productId, quantity = 1) => {
+  const addToCart = async (productId, quantity = 1, isWeightBased = false) => {
     try {
       setLoading(true);
-      await cartService.addItem(productId, quantity);
+      // Send isWeightBased flag to the backend if needed
+      await cartService.addItem(productId, quantity, isWeightBased);
       await loadCart();
     } catch (err) {
       setError(err.message || 'Erro ao adicionar item ao carrinho');
@@ -144,7 +205,12 @@ export const CartProvider = ({ children }) => {
         checkout,
         isInCart,
         getItemQuantity,
-        loadCart
+        loadCart,
+        formatWeight,
+        openWeightInput,
+        closeWeightInput,
+        weightInput,
+        handleWeightConfirm
       }}
     >
       {children}

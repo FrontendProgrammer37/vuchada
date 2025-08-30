@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, Scale } from 'lucide-react';
 import apiService from '../services/api';
+import WeightInputModal from '../components/WeightInputModal';
 
 const PDV = () => {
   const [products, setProducts] = useState([]);
@@ -10,6 +11,12 @@ const PDV = () => {
   const [amountReceived, setAmountReceived] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [weightInput, setWeightInput] = useState({
+    isOpen: false,
+    product: null,
+    isEditing: false,
+    cartItemId: null
+  });
 
   // Load products
   useEffect(() => {
@@ -36,35 +43,126 @@ const PDV = () => {
     product.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Add item to cart
+  // Add item to cart with inventory control
   const addToCart = (product) => {
+    if (product.is_weight_based) {
+      const maxWeight = product.track_inventory ? product.current_stock : null;
+      setWeightInput({
+        isOpen: true,
+        product: { ...product, maxWeight },
+        initialWeight: '0.100',
+        isEditing: false
+      });
+      return;
+    }
+
+    // Regular product with inventory control
+    if (product.track_inventory && product.current_stock <= 0) {
+      setError(`Produto ${product.name} sem estoque disponível`);
+      return;
+    }
+
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.id === product.id);
+      const existingItem = prevCart.find(item => 
+        item.id === product.id && !item.is_weight_based
+      );
+      
       if (existingItem) {
+        const newQuantity = existingItem.quantity + 1;
+        if (product.track_inventory && newQuantity > product.current_stock) {
+          setError(`Quantidade solicitada excede o estoque disponível de ${product.current_stock} unidades`);
+          return prevCart;
+        }
         return prevCart.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+          item.id === product.id && !item.is_weight_based
+            ? { ...item, quantity: newQuantity }
             : item
         );
       }
-      return [...prevCart, { ...product, quantity: 1 }];
+      
+      if (product.track_inventory && product.current_stock < 1) {
+        setError(`Produto ${product.name} sem estoque disponível`);
+        return prevCart;
+      }
+      
+      return [...prevCart, { ...product, quantity: 1, is_weight_based: false }];
     });
+  };
+
+  // Update quantity with inventory control
+  const updateQuantity = (productId, newQuantity, isWeightBased = false) => {
+    if (newQuantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+
+    setCart(prevCart => {
+      const item = prevCart.find(item => item.id === productId);
+      if (!item) return prevCart;
+
+      // Skip inventory check for weight-based items (handled in modal)
+      if (!isWeightBased && item.track_inventory && newQuantity > item.current_stock) {
+        setError(`Quantidade solicitada excede o estoque disponível de ${item.current_stock} unidades`);
+        return prevCart;
+      }
+
+      return prevCart.map(item =>
+        item.id === productId ? { ...item, quantity: newQuantity } : item
+      );
+    });
+  };
+
+  // Handle weight confirmation from modal
+  const handleWeightConfirm = (weight) => {
+    const { product, isEditing, cartItemId } = weightInput;
+    
+    if (isEditing) {
+      updateQuantity(cartItemId, weight, true);
+    } else {
+      // For new weight-based items, check inventory if tracking is enabled
+      if (product.track_inventory && weight > product.current_stock) {
+        setError(`Peso solicitado (${formatWeight(weight)} kg) excede o estoque disponível (${formatWeight(product.current_stock)} kg)`);
+        return;
+      }
+      
+      setCart(prevCart => [
+        ...prevCart,
+        {
+          ...product,
+          id: `${product.id}-${Date.now()}`,
+          quantity: weight,
+          is_weight_based: true,
+          // Update current_stock to reflect the remaining inventory
+          current_stock: product.track_inventory 
+            ? product.current_stock - weight 
+            : product.current_stock
+        }
+      ]);
+    }
+    
+    setWeightInput({ isOpen: false, product: null, isEditing: false, cartItemId: null });
+  };
+
+  // Open weight editor
+  const openWeightEditor = (item) => {
+    setWeightInput({
+      isOpen: true,
+      product: item,
+      isEditing: true,
+      cartItemId: item.id,
+      initialWeight: item.quantity.toString()
+    });
+  };
+
+  // Format weight for display
+  const formatWeight = (weight) => {
+    const value = parseFloat(weight);
+    return isNaN(value) ? '0.000 kg' : `${value.toFixed(3).replace(/\.?0+$/, '')} kg`;
   };
 
   // Remove item from cart
   const removeFromCart = (productId) => {
     setCart(prevCart => prevCart.filter(item => item.id !== productId));
-  };
-
-  // Update item quantity in cart
-  const updateQuantity = (productId, newQuantity) => {
-    if (newQuantity < 1) return;
-    
-    setCart(prevCart =>
-      prevCart.map(item =>
-        item.id === productId ? { ...item, quantity: newQuantity } : item
-      )
-    );
   };
 
   // Calculate cart total
@@ -191,22 +289,47 @@ const PDV = () => {
                           {product.sku || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                          <div className="text-sm text-gray-500">{product.description || 'Sem descrição'}</div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {product.name}
+                            {product.is_weight_based && (
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                <Scale className="h-3 w-3 mr-1" />
+                                Peso
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {product.description || 'Sem descrição'}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(product.sale_price)}
+                          <div className="flex flex-col">
+                            <span>{formatCurrency(product.sale_price)}</span>
+                            {product.is_weight_based && (
+                              <span className="text-xs text-gray-500">por kg</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {product.current_stock || 0}
+                          {product.is_weight_based ? 'Peso' : (product.current_stock || 0)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
                             onClick={() => addToCart(product)}
-                            className="text-blue-600 hover:text-blue-900"
-                            disabled={product.current_stock <= 0}
+                            className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white ${
+                              product.current_stock > 0 || product.is_weight_based
+                                ? product.is_weight_based
+                                  ? 'bg-purple-600 hover:bg-purple-700'
+                                  : 'bg-blue-600 hover:bg-blue-700'
+                                : 'bg-gray-400 cursor-not-allowed'
+                            }`}
+                            disabled={!product.is_weight_based && product.current_stock <= 0}
+                            title={product.is_weight_based ? 'Adicionar por peso' : 'Adicionar ao carrinho'}
                           >
-                            {product.current_stock > 0 ? 'Adicionar' : 'Sem Estoque'}
+                            {product.is_weight_based && <Scale className="h-3 w-3 mr-1" />}
+                            {product.current_stock > 0 || product.is_weight_base
+                              ? product.is_weight_based ? 'Pesar' : 'Adicionar'
+                              : 'Sem Estoque'}
                           </button>
                         </td>
                       </tr>
@@ -232,37 +355,74 @@ const PDV = () => {
                   {cart.map((item) => (
                     <div key={item.id} className="border-b pb-4">
                       <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-900">{item.name}</h3>
-                          <p className="text-sm text-gray-500">
-                            {formatCurrency(item.sale_price)} un.
-                          </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between">
+                            <h3 className="text-sm font-medium text-gray-900 truncate">
+                              {item.name}
+                              {item.is_weight_based && (
+                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                  <Scale className="h-3 w-3 mr-1" />
+                                  Peso
+                                </span>
+                              )}
+                            </h3>
+                            <span className="text-sm font-medium text-gray-900 ml-2">
+                              {formatCurrency(item.sale_price * item.quantity)}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex items-center text-sm text-gray-500">
+                            <span>
+                              {formatCurrency(item.sale_price)} {item.is_weight_based ? '/kg' : 'un.'}
+                            </span>
+                            <span className="mx-2">×</span>
+                            <span className="font-medium">
+                              {item.is_weight_based ? formatWeight(item.quantity) : item.quantity}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        
+                        <div className="ml-4 flex-shrink-0 flex items-center space-x-2">
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            className="text-gray-500 hover:text-gray-700 p-1"
+                            onClick={() => 
+                              item.is_weight_based 
+                                ? openWeightEditor(item)
+                                : updateQuantity(item.id, item.quantity - 1)
+                            }
+                            className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
+                            title={item.is_weight_based ? 'Editar quantidade' : 'Remover uma unidade'}
                           >
                             <Minus className="h-4 w-4" />
                           </button>
-                          <span className="w-8 text-center">{item.quantity}</span>
+                          
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="text-gray-500 hover:text-gray-700 p-1"
-                            disabled={item.quantity >= (item.current_stock || 0)}
+                            onClick={() => item.is_weight_based && openWeightEditor(item)}
+                            className={`text-sm font-medium w-8 text-center ${item.is_weight_based ? 'cursor-pointer text-purple-600 hover:text-purple-800' : ''}`}
+                            title={item.is_weight_based ? 'Clique para editar o peso' : ''}
+                          >
+                            {item.is_weight_based ? '✏️' : item.quantity}
+                          </button>
+                          
+                          <button
+                            onClick={() => 
+                              item.is_weight_base
+                                ? openWeightEditor(item)
+                                : updateQuantity(item.id, item.quantity + 1, item.is_weight_based)
+                            }
+                            className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
+                            disabled={!item.is_weight_based && item.quantity >= (item.current_stock || 0)}
+                            title={item.is_weight_based ? 'Editar quantidade' : 'Adicionar uma unidade'}
                           >
                             <Plus className="h-4 w-4" />
                           </button>
+                          
                           <button
                             onClick={() => removeFromCart(item.id)}
-                            className="text-red-500 hover:text-red-700 p-1"
+                            className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
+                            title="Remover item"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
-                      </div>
-                      <div className="mt-1 text-right text-sm font-medium">
-                        {formatCurrency(item.sale_price * item.quantity)}
                       </div>
                     </div>
                   ))}
@@ -370,6 +530,17 @@ const PDV = () => {
           </div>
         </div>
       </main>
+
+      {/* Weight Input Modal */}
+      <WeightInputModal
+        isOpen={weightInput.isOpen}
+        onClose={() => setWeightInput({ ...weightInput, isOpen: false })}
+        productName={weightInput.product?.name || ''}
+        pricePerKg={weightInput.product?.sale_price || 0}
+        initialWeight={weightInput.initialWeight}
+        maxWeight={weightInput.product?.track_inventory ? weightInput.product?.current_stock : null}
+        onConfirm={handleWeightConfirm}
+      />
     </div>
   );
 };
