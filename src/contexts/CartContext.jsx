@@ -14,19 +14,20 @@ export const CartProvider = ({ children }) => {
   
   // Inicializa o sessionId a partir do localStorage ou gera um novo
   const [sessionId, setSessionId] = useState(() => {
-    const savedSessionId = localStorage.getItem('sessionId');
-    return savedSessionId || `sess_${Math.random().toString(36).substr(2, 9)}`;
+    // Tenta obter o sessionId do localStorage
+    let savedSessionId = localStorage.getItem('sessionId');
+    
+    // Se não existir, gera um novo
+    if (!savedSessionId) {
+      savedSessionId = `sess_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('sessionId', savedSessionId);
+    }
+    
+    return savedSessionId;
   });
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // Salva o sessionId no localStorage sempre que ele mudar
-  useEffect(() => {
-    if (sessionId) {
-      localStorage.setItem('sessionId', sessionId);
-    }
-  }, [sessionId]);
 
   // Atualiza o estado do carrinho
   const updateCartState = useCallback((cartData) => {
@@ -109,7 +110,7 @@ export const CartProvider = ({ children }) => {
   const clearCart = useCallback(async () => {
     try {
       setLoading(true);
-      await cartService.clearCart(sessionId);
+      await cartService.clearCart();
       updateCartState({
         items: [],
         subtotal: 0,
@@ -136,7 +137,7 @@ export const CartProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, updateCartState]);
+  }, [updateCartState]);
 
   // Finalizar compra
   const checkout = useCallback(async (paymentMethod, customerId = null, notes = '') => {
@@ -168,6 +169,11 @@ export const CartProvider = ({ children }) => {
     clearCart,
     checkout
   };
+
+  // Carrega o carrinho ao montar o componente
+  useEffect(() => {
+    loadCart();
+  }, [loadCart]);
 
   return (
     <CartContext.Provider value={value}>

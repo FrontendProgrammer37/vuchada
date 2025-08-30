@@ -2,12 +2,20 @@ import apiService from './api';
 
 const CART_ENDPOINT = '/cart';  // Removido /api/v1 pois já está na baseURL
 
+// Função auxiliar para obter o sessionId
+const getSessionId = () => {
+  return localStorage.getItem('sessionId') || '';
+};
+
 const cartService = {
   // Adicionar item ao carrinho
   async addItem(productId, quantity = 1) {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/add`, {
         method: 'POST',
+        headers: {
+          'X-Session-ID': getSessionId()
+        },
         body: {
           product_id: productId,
           quantity: quantity
@@ -23,7 +31,11 @@ const cartService = {
   // Obter carrinho atual
   async getCart() {
     try {
-      const response = await apiService.request(CART_ENDPOINT);
+      const response = await apiService.request(CART_ENDPOINT, {
+        headers: {
+          'X-Session-ID': getSessionId()
+        }
+      });
       return response;
     } catch (error) {
       // Se o carrinho não existir, retorna um carrinho vazio
@@ -40,6 +52,9 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/update`, {
         method: 'PUT',
+        headers: {
+          'X-Session-ID': getSessionId()
+        },
         body: {
           product_id: productId,
           quantity: quantity
@@ -57,29 +72,29 @@ const cartService = {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
         method: 'DELETE',
-        body: { product_id: productId }
+        headers: {
+          'X-Session-ID': getSessionId()
+        },
+        body: {
+          product_id: productId
+        }
       });
       return response;
     } catch (error) {
-      console.error('Erro ao remover item:', error);
+      console.error('Erro ao remover item do carrinho:', error);
       throw error;
     }
   },
 
   // Limpar carrinho
-  async clearCart(sessionId) {
+  async clearCart() {
     try {
-      if (!sessionId) {
-        throw new Error('Session ID é obrigatório para limpar o carrinho');
-      }
-      
       const response = await apiService.request(CART_ENDPOINT, {
         method: 'DELETE',
         headers: {
-          'X-Session-ID': sessionId
+          'X-Session-ID': getSessionId()
         }
       });
-      
       return response;
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
@@ -108,25 +123,20 @@ const cartService = {
   // Finalizar compra/checkout
   async checkout(paymentMethod, customerId = null, notes = '') {
     try {
-      if (!paymentMethod) {
-        throw new Error('Método de pagamento é obrigatório');
-      }
-
       const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
         method: 'POST',
+        headers: {
+          'X-Session-ID': getSessionId()
+        },
         body: {
-          payment_method: paymentMethod.toUpperCase(), // Ensure uppercase as required by the API
+          payment_method: paymentMethod,
           customer_id: customerId,
           notes: notes
         }
       });
-      
-      // Clear cart after successful checkout
-      await this.clearCart();
-      
       return response;
     } catch (error) {
-      console.error('Erro ao finalizar venda:', error);
+      console.error('Erro ao finalizar compra:', error);
       throw error;
     }
   }

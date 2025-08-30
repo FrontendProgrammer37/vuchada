@@ -8,9 +8,10 @@ class ApiService {
     }
 
     // Configurar headers com token de autenticação
-    getHeaders() {
+    getHeaders(customHeaders = {}) {
         const headers = {
             'Content-Type': 'application/json',
+            ...customHeaders // Inclui headers personalizados
         };
         
         if (this.token) {
@@ -40,62 +41,58 @@ class ApiService {
         
         // Se body for um objeto e não for FormData, converte para JSON
         let body = options.body;
-        const headers = this.getHeaders();
+        
+        // Obtém os headers personalizados das opções, se existirem
+        const customHeaders = options.headers || {};
+        const headers = this.getHeaders(customHeaders);
         
         if (body && typeof body === 'object' && !(body instanceof FormData)) {
             body = JSON.stringify(body);
-            headers['Content-Type'] = 'application/json';
+        } else if (body instanceof FormData) {
+            // Se for FormData, não definir Content-Type, o navegador fará isso automaticamente
+            // com o boundary correto
+            delete headers['Content-Type'];
         }
         
         const config = {
-            method: 'GET',
-            headers,
-            ...options,
-            body, // Adiciona o body processado
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+            method: options.method || 'GET',
+            headers: headers,
+            ...options, // Isso sobrescreve os valores padrão se fornecidos
+            body: body
         };
 
         try {
             const response = await fetch(url, config);
             
-            // Clona a resposta para podermos lê-la mais de uma vez se necessário
-            const responseClone = response.clone();
-            
-            if (!response.ok) {
-                let errorMessage = 'Erro na requisição';
-                try {
-                    const errorData = await responseClone.json().catch(() => ({}));
-                    errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
-                } catch (e) {
-                    errorMessage = await responseClone.text().catch(() => 'Erro desconhecido');
-                }
-                
-                const error = new Error(errorMessage);
-                error.status = response.status;
-                error.response = response;
-                throw error;
-            }
-
             // Se a resposta for 204 (No Content), retorna null
             if (response.status === 204) {
                 return null;
             }
-
+            
             // Tenta fazer o parse da resposta como JSON
-            try {
-                return await response.json();
-            } catch (e) {
-                console.warn('Resposta não é um JSON válido, retornando como texto');
-                return await response.text();
+            const data = await response.json().catch(() => ({}));
+            
+            // Se a resposta não for bem-sucedida, lança um erro
+            if (!response.ok) {
+                const error = new Error(data.message || 'Erro na requisição');
+                error.status = response.status;
+                error.response = data;
+                throw error;
             }
+            
+            return data;
         } catch (error) {
-            console.error('Erro na requisição:', {
-                url,
-                error: error.message,
-                status: error.status,
-                response: error.response ? await error.response.clone().text().catch(() => null) : null
-            });
+            console.error(`Erro na requisição para ${url}:`, error);
+            
+            // Se o erro for de autenticação, remove o token
+            if (error.status === 401) {
+                this.removeToken();
+                // Redireciona para a página de login
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
+            }
+            
             throw error;
         }
     }
