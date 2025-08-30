@@ -7,18 +7,14 @@ import cartService from '../services/cartService';
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('pt-MZ', {
     style: 'currency',
-    currency: 'MZN',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    currency: 'MZN'
   }).format(value);
 };
 
 // Função para formatar peso
 const formatWeight = (weight) => {
-  return new Intl.NumberFormat('pt-MZ', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3
-  }).format(weight);
+  const value = parseFloat(weight);
+  return isNaN(value) ? '0.000' : value.toFixed(3).replace(/\.?0+$/, '');
 };
 
 // Payment methods constant
@@ -36,50 +32,58 @@ const PAYMENT_METHODS = [
   { value: 'MYBUCKS', label: 'MyBucks' }
 ];
 
-const WeightInputModal = ({ isOpen, onClose, product, onConfirm, isEditing }) => {
-  const [weight, setWeight] = useState('');
+const WeightInputModal = ({ 
+  isOpen, 
+  onClose, 
+  product, 
+  initialWeight = '0.100',
+  onConfirm 
+}) => {
+  const [weight, setWeight] = useState(initialWeight);
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setWeight('');
+      setWeight(initialWeight);
       setValue('');
       setError('');
     }
-  }, [isOpen]);
+  }, [isOpen, initialWeight]);
 
-  const calculateWeight = (val) => {
-    if (!val || isNaN(val) || val <= 0) return '';
-    return (val / product.sale_price).toFixed(3);
+  const calculateValue = (weight) => {
+    const val = parseFloat(weight) * product.sale_price;
+    return isNaN(val) ? '' : val.toFixed(2);
   };
 
-  const calculateValue = (w) => {
-    if (!w || isNaN(w) || w <= 0) return '';
-    return (w * product.sale_price).toFixed(2);
+  const calculateWeight = (val) => {
+    const weight = parseFloat(val) / product.sale_price;
+    return isNaN(weight) ? '' : weight.toFixed(3);
   };
 
   const handleWeightChange = (e) => {
-    const w = parseFloat(e.target.value);
-    setWeight(e.target.value);
-    setValue(calculateValue(w));
-    validateInput(w);
+    const newWeight = e.target.value;
+    setWeight(newWeight);
+    setValue(calculateValue(newWeight));
+    validateInput(newWeight);
   };
 
   const handleValueChange = (e) => {
-    const val = parseFloat(e.target.value);
-    setValue(e.target.value);
-    setWeight(calculateWeight(val));
-    validateInput(calculateWeight(val));
+    const newValue = e.target.value;
+    setValue(newValue);
+    const calculatedWeight = calculateWeight(newValue);
+    setWeight(calculatedWeight);
+    validateInput(calculatedWeight);
   };
 
-  const validateInput = (w) => {
-    if (!w || isNaN(w) || w <= 0) {
-      setError('Por favor, insira um valor válido');
+  const validateInput = (weight) => {
+    const weightNum = parseFloat(weight);
+    if (isNaN(weightNum) || weightNum <= 0) {
+      setError('Peso inválido');
       return false;
     }
-    if (product.track_inventory && w > product.current_stock) {
-      setError(`Estoque insuficiente. Disponível: ${product.current_stock} KG`);
+    if (product.track_inventory && weightNum > product.current_stock) {
+      setError(`Peso excede o estoque disponível de ${product.current_stock} kg`);
       return false;
     }
     setError('');
@@ -87,9 +91,8 @@ const WeightInputModal = ({ isOpen, onClose, product, onConfirm, isEditing }) =>
   };
 
   const handleConfirm = () => {
-    const w = parseFloat(weight);
-    if (validateInput(w)) {
-      onConfirm(product, w);
+    if (validateInput(weight)) {
+      onConfirm(parseFloat(weight));
       onClose();
     }
   };
@@ -108,11 +111,11 @@ const WeightInputModal = ({ isOpen, onClose, product, onConfirm, isEditing }) =>
             <h4 className="text-lg font-medium text-gray-900">{product.name}</h4>
             <p className="text-sm text-gray-500">Código: {product.code || 'N/A'}</p>
             <p className="text-green-600 font-medium mt-1">
-              Preço por KG: {formatCurrency(product.sale_price)}/KG
+              Preço por KG: {formatCurrency(product.sale_price)}
             </p>
             {product.track_inventory && (
               <p className="text-blue-600 text-sm mt-1">
-                Estoque disponível: {product.current_stock} KG
+                Estoque disponível: {formatWeight(product.current_stock)} kg
               </p>
             )}
           </div>
@@ -149,44 +152,37 @@ const WeightInputModal = ({ isOpen, onClose, product, onConfirm, isEditing }) =>
                   onChange={handleWeightChange}
                   className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-3 pr-12 sm:text-sm border-gray-300 rounded-md p-2 border"
                   placeholder="0.000"
-                  min="0"
+                  min="0.001"
                   step="0.001"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <span className="text-gray-500 sm:text-sm">KG</span>
                 </div>
               </div>
-              {weight && (
-                <p className="mt-1 text-sm text-gray-500">
-                  Peso: {parseFloat(weight).toFixed(3)} KG
-                </p>
-              )}
+              <p className="mt-1 text-sm text-gray-600">
+                Peso: {formatWeight(weight)} KG
+              </p>
             </div>
 
             {error && (
               <p className="text-sm text-red-600">{error}</p>
             )}
           </div>
-        </div>
 
-        <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!weight || parseFloat(weight) <= 0 || !!error}
-            className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
-              !weight || parseFloat(weight) <= 0 || error
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
-          >
-            {isEditing ? 'Atualizar' : 'Adicionar ao Carrinho'}
-          </button>
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirm}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            >
+              Confirmar
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -331,82 +327,46 @@ const PDVPage = () => {
 
   // Renderizar produto na lista
   const renderProduct = (product) => (
-    <div key={product.id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
-      <h3 className="font-bold text-gray-800">{product.name}</h3>
-      <p className="text-gray-600 text-sm mb-2">{product.description || 'Sem descrição'}</p>
-      <div className="flex justify-between items-center mt-2">
-        <div>
-          <span className="font-bold text-blue-600">{formatCurrency(product.sale_price)}</span>
-          {product.venda_por_peso && (
-            <span className="ml-1 text-xs text-gray-500">por kg</span>
-          )}
-          <div className="text-sm text-gray-500">
-            {product.venda_por_peso 
-              ? formatWeight(product.estoque) + ' kg' 
-              : product.estoque}
-          </div>
-        </div>
-        <button
-          onClick={() => addToCart(product)}
-          className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white ${
-            (product.estoque > 0 || product.venda_por_peso)
-              ? (product.venda_por_peso ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700')
-              : 'bg-gray-400 cursor-not-allowed'
-          }`}
-          disabled={!product.venda_por_peso && product.estoque <= 0}
-          title={product.venda_por_peso ? 'Adicionar por peso' : 'Adicionar ao carrinho'}
-        >
-          {product.venda_por_peso ? (
-            <>
-              <Scale className="h-3 w-3 mr-1" />
-              Pesar
-            </>
-          ) : (
-            product.estoque > 0 ? 'Adicionar' : 'Sem Estoque'
-          )}
-        </button>
-      </div>
+    <div
+      key={product.id}
+      onClick={() => addToCart(product)}
+      className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow"
+    >
+      <h3 className="font-medium text-gray-900">{product.name}</h3>
+      <p className="text-green-600 font-medium">{formatCurrency(product.sale_price)}</p>
+      {product.track_inventory && (
+        <p className="text-sm text-gray-500">
+          Estoque: {product.is_weight_based ? formatWeight(product.current_stock) + ' kg' : product.current_stock}
+        </p>
+      )}
     </div>
   );
 
   // Renderizar item do carrinho
   const renderCartItem = (item) => (
-    <div key={item.id} className="flex justify-between items-center py-3 border-b border-gray-100">
-      <div className="flex-1">
-        <div className="font-medium text-gray-800">{item.name}</div>
-        <div className="text-sm text-gray-500">
-          {formatCurrency(item.unit_price)} × {item.quantity}
+    <div key={item.id} className="border-b py-3 px-4">
+      <div className="flex justify-between">
+        <div>
+          <h4 className="font-medium">{item.name}</h4>
+          {item.is_weight_based ? (
+            <p className="text-sm text-gray-500">
+              {formatWeight(item.quantity)} kg × {formatCurrency(item.unit_price)}/kg
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500">
+              {item.quantity} × {formatCurrency(item.unit_price)}
+            </p>
+          )}
         </div>
-      </div>
-      <div className="flex items-center space-x-1">
-        <button
-          onClick={() => {
-            const newQuantity = item.quantity - 1;
-            if (newQuantity === 0) {
-              setCart(cart.filter(i => i.id !== item.id));
-            } else {
-              setCart(cart.map(i =>
-                i.id === item.id ? { ...i, quantity: newQuantity } : i
-              ));
-            }
-          }}
-          className="text-gray-500 hover:text-red-600 p-1 rounded-full hover:bg-gray-100"
-          aria-label="Diminuir quantidade"
-        >
-          <Minus size={16} />
-        </button>
-        <span className="mx-2 w-6 text-center text-gray-700">{item.quantity}</span>
-        <button
-          onClick={() => {
-            setCart(cart.map(i =>
-              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-            ));
-          }}
-          className="text-gray-500 hover:text-green-600 p-1 rounded-full hover:bg-gray-100"
-          aria-label="Aumentar quantidade"
-        >
-          <Plus size={16} />
-        </button>
+        <div className="text-right">
+          <p className="font-medium">{formatCurrency(item.quantity * item.unit_price)}</p>
+          <button
+            onClick={() => removeFromCart(item.id)}
+            className="text-red-500 hover:text-red-700 text-sm"
+          >
+            Remover
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -480,7 +440,7 @@ const PDVPage = () => {
       ) : (
         <div className="flex flex-1 overflow-hidden">
           {/* Área de produtos */}
-          <div className={`${showCart && isMobile ? 'hidden' : 'block'} lg:block flex-1`}>
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 250px)' }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {products.map(renderProduct)}
             </div>
@@ -524,7 +484,7 @@ const PDVPage = () => {
                   </div>
                 ) : (
                   <>
-                    <div className={`overflow-y-auto ${cart.length > 2 ? 'h-1/2' : 'flex-1'}`}>
+                    <div className={`overflow-y-auto ${cart.length > 2 ? 'max-h-64' : 'max-h-full'}`}>
                       {cart.map(renderCartItem)}
                     </div>
                     
@@ -649,7 +609,6 @@ const PDVPage = () => {
         onClose={() => setWeightInput({ ...weightInput, isOpen: false })}
         product={weightInput.product}
         onConfirm={handleWeightConfirm}
-        isEditing={weightInput.isEditing}
       />
     </div>
   );
