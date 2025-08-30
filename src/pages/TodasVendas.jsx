@@ -288,7 +288,7 @@ const TodasVendas = () => {
             <button
               type="button"
               onClick={aplicarFiltro}
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
+              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Aplicar Filtros
             </button>
@@ -532,115 +532,83 @@ const TodasVendas = () => {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        title={`Detalhes da Venda ${selectedVenda?.sale_number || ''}`}
+        title={`Detalhes da Venda ${selectedVenda?.sale_number || selectedVenda?.id || ''}`}
       >
         {selectedVenda && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Data</p>
                 <p className="font-medium">{formatarData(selectedVenda.created_at)}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Status</p>
-                <p className="font-medium">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    selectedVenda.status === 'concluída' ? 'bg-green-100 text-green-800' :
-                    selectedVenda.status === 'cancelada' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {selectedVenda.status || 'Pendente'}
-                  </span>
-                </p>
+                <p className="font-medium">{selectedVenda.status || 'Pendente'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Método de Pagamento</p>
-                <p className="font-medium capitalize">{selectedVenda.payment_method || 'Não informado'}</p>
+                <p className="font-medium">{selectedVenda.payment_method || 'Não especificado'}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Valor Total</p>
-                <p className="font-medium text-lg">{formatarMoeda(selectedVenda.total_amount)}</p>
+                <p className="font-medium">{formatarMoeda(selectedVenda.total_amount || 0)}</p>
               </div>
-              {selectedVenda.customer && (
-                <div className="sm:col-span-2">
-                  <p className="text-sm text-gray-500">Cliente</p>
-                  <p className="font-medium">
-                    {selectedVenda.customer.name}
-                    {selectedVenda.customer.phone ? ` (${selectedVenda.customer.phone})` : ''}
-                  </p>
-                </div>
-              )}
             </div>
             
             <div className="mt-6">
-              <h4 className="text-lg font-medium text-gray-900 mb-3">Itens da Venda</h4>
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Itens da Venda</h4>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Produto
                       </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Qtd
                       </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Preço Unit.
                       </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Subtotal
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {selectedVenda.items?.map((item, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.product?.name || 'Produto não encontrado'}
-                          </div>
-                          {item.notes && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {item.notes}
+                    {selectedVenda.sale_items?.length > 0 ? (
+                      selectedVenda.sale_items.map((item, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.product?.name || 'Produto não especificado'}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                          {item.quantity}x
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                          {formatarMoeda(item.unit_price)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                          {formatarMoeda(item.subtotal)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan="3" className="text-right px-6 py-2 text-sm font-medium text-gray-500">
-                        Subtotal:
-                      </td>
-                      <td className="px-6 py-2 text-right text-sm font-medium text-gray-900">
-                        {formatarMoeda(selectedVenda.subtotal || 0)}
-                      </td>
-                    </tr>
-                    {selectedVenda.discount > 0 && (
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.quantity}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatarMoeda(item.unit_price || 0)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                            {formatarMoeda((item.quantity || 0) * (item.unit_price || 0))}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
                       <tr>
-                        <td colSpan="3" className="text-right px-6 py-2 text-sm font-medium text-gray-500">
-                          Desconto:
-                        </td>
-                        <td className="px-6 py-2 text-right text-sm font-medium text-red-600">
-                          -{formatarMoeda(selectedVenda.discount || 0)}
+                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                          Nenhum item encontrado
                         </td>
                       </tr>
                     )}
+                  </tbody>
+                  <tfoot className="bg-gray-50">
                     <tr>
                       <td colSpan="3" className="text-right px-6 py-2 text-sm font-medium text-gray-900">
                         Total:
                       </td>
-                      <td className="px-6 py-2 text-right text-base font-bold text-gray-900">
+                      <td className="px-6 py-2 text-right text-sm font-bold text-gray-900">
                         {formatarMoeda(selectedVenda.total_amount || 0)}
                       </td>
                     </tr>
@@ -655,16 +623,6 @@ const TodasVendas = () => {
                 <p className="text-sm text-gray-900 whitespace-pre-line">{selectedVenda.notes}</p>
               </div>
             )}
-            
-            <div className="mt-6 pt-6 border-t border-gray-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Fechar
-              </button>
-            </div>
           </div>
         )}
       </Modal>

@@ -17,17 +17,10 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="sm:flex sm:items-start justify-between">
+            <div className="sm:flex sm:items-center justify-between">
               <h3 className="text-lg leading-6 font-medium text-gray-900">
                 {title}
               </h3>
-              <button
-                type="button"
-                className="text-gray-400 hover:text-gray-500 focus:outline-none"
-                onClick={onClose}
-              >
-                <X className="h-6 w-6" />
-              </button>
             </div>
             <div className="mt-4">
               {children}
