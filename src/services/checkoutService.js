@@ -34,7 +34,11 @@ const checkoutService = {
    */
   async getCart(sessionId = 'default') {
     try {
-      return await apiService.request(`${CHECKOUT_ENDPOINT}?session_id=${sessionId}`);
+      return await apiService.request(`${CHECKOUT_ENDPOINT}?session_id=${sessionId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
     } catch (error) {
       console.error('Erro ao obter carrinho:', error);
       throw error;
