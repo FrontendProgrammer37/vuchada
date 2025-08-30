@@ -2,6 +2,21 @@ import apiService from './api';
 
 const CART_ENDPOINT = '/api/v1/cart';
 
+// Opções de pagamento disponíveis
+export const PAYMENT_METHODS = {
+  CASH: 'DINHEIRO',
+  MPESA: 'MPESA',
+  EMOLA: 'EMOLA',
+  CREDIT_CARD: 'CARTAO_POS',
+  BANK_TRANSFER: 'TRANSFERENCIA',
+  MILLENNIUM: 'MILLENNIUM',
+  BCI: 'BCI',
+  STANDARD_BANK: 'STANDARD_BANK',
+  ABSA_BANK: 'ABSA_BANK',
+  LETSHEGO: 'LETSHEGO',
+  MYBUCKS: 'MYBUCKS'
+};
+
 const cartService = {
   // Adicionar item ao carrinho
   async addItem(productId, quantity = 1) {
@@ -21,9 +36,9 @@ const cartService = {
   },
 
   // Obter carrinho atual
-  async getCart() {
+  async getCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(CART_ENDPOINT);
+      const response = await apiService.request(`${CART_ENDPOINT}?session_id=${sessionId}`);
       return response;
     } catch (error) {
       // Se o carrinho não existir, retorna um carrinho vazio
@@ -36,9 +51,9 @@ const cartService = {
   },
 
   // Atualizar quantidade de um item
-  async updateItemQuantity(productId, quantity) {
+  async updateItemQuantity(productId, quantity, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/update`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/update?session_id=${sessionId}`, {
         method: 'PUT',
         body: {
           product_id: productId,
@@ -53,23 +68,23 @@ const cartService = {
   },
 
   // Remover item do carrinho
-  async removeItem(productId) {
+  async removeItem(productId, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/remove?session_id=${sessionId}`, {
         method: 'DELETE',
         body: { product_id: productId }
       });
       return response;
     } catch (error) {
-      console.error('Erro ao remover item:', error);
+      console.error('Erro ao remover item do carrinho:', error);
       throw error;
     }
   },
 
   // Limpar carrinho
-  async clearCart() {
+  async clearCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/clear`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/clear?session_id=${sessionId}`, {
         method: 'DELETE'
       });
       return response;
@@ -91,25 +106,70 @@ const cartService = {
   },
 
   // Finalizar compra/checkout
-  async checkout() {
+  async checkout(paymentMethod, customerId = null, notes = '', sessionId = 'default') {
     try {
-      const response = await apiService.request('cart/checkout', {
-        method: 'POST',
-        body: {
-          payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
-          items: (await this.getCart()).items.map(item => ({
-            product_id: item.id,
-            quantity: item.quantity
-          }))
+      if (!paymentMethod) {
+        throw new Error('Método de pagamento é obrigatório');
+      }
+
+      // Verifica se o método de pagamento é válido
+      if (!Object.values(PAYMENT_METHODS).includes(paymentMethod)) {
+        throw new Error('Método de pagamento inválido');
+      }
+
+      const response = await apiService.request(
+        `${CART_ENDPOINT}/checkout?session_id=${sessionId}`,
+        {
+          method: 'POST',
+          body: {
+            payment_method: paymentMethod,
+            customer_id: customerId,
+            notes: notes
+          }
         }
-      });
-      
-      // Clear cart after successful checkout
-      await this.clearCart();
-      
+      );
+
       return response;
     } catch (error) {
-      console.error('Erro ao finalizar venda:', error);
+      console.error('Erro ao finalizar compra:', error);
+      
+      // Tratamento de erros específicos
+      if (error.response) {
+        const { status, data } = error.response;
+        
+        if (status === 400) {
+          throw new Error(data.detail || 'Dados inválidos para finalizar a compra');
+        } else if (status === 401) {
+          throw new Error('Não autorizado. Por favor, faça login novamente.');
+        } else if (status === 404) {
+          throw new Error('Carrinho não encontrado ou vazio');
+        } else if (status >= 500) {
+          throw new Error('Erro no servidor ao processar o pagamento');
+        }
+      }
+      
+      throw error;
+    }
+  },
+
+  // Obter histórico de vendas
+  async getSalesHistory(page = 1, limit = 10) {
+    try {
+      const response = await apiService.request(`/api/v1/sales?page=${page}&limit=${limit}`);
+      return response;
+    } catch (error) {
+      console.error('Erro ao buscar histórico de vendas:', error);
+      throw error;
+    }
+  },
+
+  // Obter detalhes de uma venda específica
+  async getSaleDetails(saleId) {
+    try {
+      const response = await apiService.request(`/api/v1/sales/${saleId}`);
+      return response;
+    } catch (error) {
+      console.error('Erro ao buscar detalhes da venda:', error);
       throw error;
     }
   }
