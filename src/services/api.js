@@ -404,8 +404,27 @@ class ApiService {
 
     // ===== VENDAS =====
     
-    async getSales() {
-        return this.request('sales/');
+    async getSales({ skip = 0, limit = 10 } = {}) {
+        const params = new URLSearchParams();
+        if (skip) params.append('skip', skip);
+        if (limit) params.append('limit', limit);
+        
+        const queryString = params.toString();
+        const endpoint = `sales/${queryString ? `?${queryString}` : ''}`;
+        
+        const sales = await this.request(endpoint);
+        
+        // Format the response to include product details
+        return sales.map(sale => ({
+            ...sale,
+            items: sale.items ? sale.items.map(item => ({
+                ...item,
+                product: {
+                    id: item.product_id,
+                    name: item.product?.nome || 'Produto não encontrado'
+                }
+            })) : []
+        }));
     }
 
     async getSale(id) {

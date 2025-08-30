@@ -29,57 +29,29 @@ const TodasVendas = () => {
   const carregarVendas = async () => {
     try {
       setLoading(true);
-      // Aqui podemos adicionar parâmetros de filtro e paginação quando a API suportar
-      const vendas = await apiService.getSales();
+      const skip = (paginacao.pagina - 1) * paginacao.itensPorPagina;
       
-      // Aplicar filtros localmente enquanto não temos filtros na API
-      let vendasFiltradas = [...vendas];
+      // Buscar vendas com paginação
+      const vendas = await apiService.getSales({ 
+        skip, 
+        limit: paginacao.itensPorPagina 
+      });
       
-      if (filtro.dataInicio) {
-        vendasFiltradas = vendasFiltradas.filter(v => 
-          new Date(v.created_at) >= new Date(filtro.dataInicio)
-        );
-      }
+      // Atualizar estado
+      setVendas(vendas);
       
-      if (filtro.dataFim) {
-        vendasFiltradas = vendasFiltradas.filter(v => 
-          new Date(v.created_at) <= new Date(filtro.dataFim)
-        );
-      }
+      // Se precisar do total de itens para paginação, você pode precisar de um endpoint separado
+      // ou ajustar a API para retornar o total junto com os dados
+      // Por enquanto, vamos apenas ver se há mais itens do que o limite
+      const temMaisItens = vendas.length === paginacao.itensPorPagina;
+      setPaginacao(prev => ({
+        ...prev,
+        total: temMaisItens ? prev.total || vendas.length + 1 : vendas.length
+      }));
       
-      if (filtro.status) {
-        vendasFiltradas = vendasFiltradas.filter(v => 
-          v.status && v.status.toLowerCase().includes(filtro.status.toLowerCase())
-        );
-      }
-      
-      if (filtro.valorMinimo) {
-        vendasFiltradas = vendasFiltradas.filter(v => 
-          Number(v.total_amount || 0) >= Number(filtro.valorMinimo)
-        );
-      }
-      
-      if (filtro.valorMaximo) {
-        vendasFiltradas = vendasFiltradas.filter(v => 
-          Number(v.total_amount || 0) <= Number(filtro.valorMaximo)
-        );
-      }
-      
-      // Ordenar por data mais recente
-      vendasFiltradas.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-      
-      // Calcular total para paginação
-      const total = vendasFiltradas.length;
-      
-      // Aplicar paginação
-      const inicio = (paginacao.pagina - 1) * paginacao.itensPorPagina;
-      const fim = inicio + paginacao.itensPorPagina;
-      const vendasPaginadas = vendasFiltradas.slice(inicio, fim);
-      
-      setVendas(vendasPaginadas);
-      setPaginacao(prev => ({ ...prev, total }));
       setError(null);
     } catch (err) {
+      console.error('Erro ao carregar vendas:', err);
       setError(err.message || 'Erro ao carregar vendas');
     } finally {
       setLoading(false);
@@ -175,8 +147,10 @@ const TodasVendas = () => {
   };
 
   const formatarItensVenda = (itens) => {
-    if (!itens || !Array.isArray(itens)) return 'Nenhum item encontrado';
-    
+    if (!itens || !Array.isArray(itens) || itens.length === 0) {
+      return <p className="text-gray-500">Nenhum item encontrado</p>;
+    }
+
     return (
       <div className="mt-4">
         <h4 className="font-medium text-gray-900 mb-2">Itens da Venda</h4>
@@ -203,7 +177,7 @@ const TodasVendas = () => {
                     {formatarMoeda(item.unit_price)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatarMoeda(item.subtotal)}
+                    {formatarMoeda(item.total_price)}
                   </td>
                 </tr>
               ))}
@@ -532,94 +506,70 @@ const TodasVendas = () => {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
-        title={`Detalhes da Venda ${selectedVenda?.sale_number || selectedVenda?.id || ''}`}
+        title={`Detalhes da Venda #${selectedVenda?.sale_number || ''}`}
       >
         {selectedVenda && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Número da Venda</p>
+                <p className="font-medium">{selectedVenda.sale_number || 'N/A'}</p>
+              </div>
               <div>
                 <p className="text-sm text-gray-500">Data</p>
                 <p className="font-medium">{formatarData(selectedVenda.created_at)}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Status</p>
-                <p className="font-medium">{selectedVenda.status || 'Pendente'}</p>
+                <p className="font-medium capitalize">
+                  {selectedVenda.status === 'concluida' ? 'Concluída' : 
+                   selectedVenda.status === 'cancelada' ? 'Cancelada' : 
+                   selectedVenda.status || 'Pendente'}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Método de Pagamento</p>
-                <p className="font-medium">{selectedVenda.payment_method || 'Não especificado'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Valor Total</p>
-                <p className="font-medium">{formatarMoeda(selectedVenda.total_amount || 0)}</p>
-              </div>
-            </div>
-            
-            <div className="mt-6">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">Itens da Venda</h4>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Produto
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Qtd
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Preço Unit.
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Subtotal
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {(selectedVenda.sale_items?.length > 0 ? selectedVenda.sale_items : selectedVenda.items || [])?.map((item, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.product?.name || item.name || 'Produto não especificado'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.quantity}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatarMoeda(item.unit_price || item.price || 0)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                          {formatarMoeda((item.quantity || 0) * (item.unit_price || item.price || 0))}
-                        </td>
-                      </tr>
-                    ))}
-                    {!selectedVenda.sale_items?.length && !selectedVenda.items?.length && (
-                      <tr>
-                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
-                          Nenhum item encontrado
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td colSpan="3" className="text-right px-6 py-2 text-sm font-medium text-gray-900">
-                        Total:
-                      </td>
-                      <td className="px-6 py-2 text-right text-sm font-bold text-gray-900">
-                        {formatarMoeda(selectedVenda.total_amount || 0)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                <p className="font-medium">
+                  {selectedVenda.payment_method === 'DINHEIRO' ? 'Dinheiro' :
+                   selectedVenda.payment_method === 'CARTAO_POS' ? 'Cartão POS' :
+                   selectedVenda.payment_method === 'TRANSFERENCIA' ? 'Transferência' :
+                   selectedVenda.payment_method || 'Não especificado'}
+                </p>
               </div>
             </div>
-            
+
+            {/* Resumo de valores */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Subtotal</p>
+                  <p className="font-medium">{formatarMoeda(selectedVenda.subtotal || 0)}</p>
+                </div>
+                {selectedVenda.discount_amount > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-500">Desconto</p>
+                    <p className="font-medium text-red-600">-{formatarMoeda(selectedVenda.discount_amount || 0)}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-gray-500">Impostos</p>
+                  <p className="font-medium">{formatarMoeda(selectedVenda.tax_amount || 0)}</p>
+                </div>
+                <div className="border-t pt-2">
+                  <p className="text-sm font-medium text-gray-900">Total</p>
+                  <p className="text-lg font-bold">{formatarMoeda(selectedVenda.total_amount || 0)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Itens da venda */}
+            {formatarItensVenda(selectedVenda.items || [])}
+
+            {/* Notas adicionais */}
             {selectedVenda.notes && (
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Observações</h4>
-                <p className="text-sm text-gray-900 whitespace-pre-line">{selectedVenda.notes}</p>
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-500">Observações</p>
+                <p className="mt-1 text-sm text-gray-900">{selectedVenda.notes}</p>
               </div>
             )}
           </div>
