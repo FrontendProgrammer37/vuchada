@@ -38,10 +38,20 @@ class ApiService {
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
         const url = `${this.baseURL}/${normalizedEndpoint}`;
         
+        // Se body for um objeto e não for FormData, converte para JSON
+        let body = options.body;
+        const headers = this.getHeaders();
+        
+        if (body && typeof body === 'object' && !(body instanceof FormData)) {
+            body = JSON.stringify(body);
+            headers['Content-Type'] = 'application/json';
+        }
+        
         const config = {
             method: 'GET',
-            headers: this.getHeaders(),
+            headers,
             ...options,
+            body, // Adiciona o body processado
             mode: 'cors', // Força o modo CORS
             credentials: 'include', // Inclui credenciais se necessário
         };
@@ -49,13 +59,16 @@ class ApiService {
         try {
             const response = await fetch(url, config);
             
+            // Clona a resposta para podermos lê-la mais de uma vez se necessário
+            const responseClone = response.clone();
+            
             if (!response.ok) {
                 let errorMessage = 'Erro na requisição';
                 try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.detail || JSON.stringify(errorData);
+                    const errorData = await responseClone.json().catch(() => ({}));
+                    errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
                 } catch (e) {
-                    errorMessage = await response.text();
+                    errorMessage = await responseClone.text().catch(() => 'Erro desconhecido');
                 }
                 
                 const error = new Error(errorMessage);
@@ -73,7 +86,7 @@ class ApiService {
             try {
                 return await response.json();
             } catch (e) {
-                console.warn('Resposta não é um JSON válido:', e);
+                console.warn('Resposta não é um JSON válido, retornando como texto');
                 return await response.text();
             }
         } catch (error) {
@@ -81,7 +94,7 @@ class ApiService {
                 url,
                 error: error.message,
                 status: error.status,
-                response: error.response ? await error.response.text() : null
+                response: error.response ? await error.response.clone().text().catch(() => null) : null
             });
             throw error;
         }

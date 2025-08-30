@@ -69,7 +69,7 @@ const cartService = {
   // Limpar carrinho
   async clearCart() {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/clear`, {
+      const response = await apiService.request('cart', {
         method: 'DELETE'
       });
       return response;
