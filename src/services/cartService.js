@@ -69,15 +69,27 @@ const cartService = {
   // Limpar carrinho
   async clearCart(sessionId) {
     try {
-      const response = await apiService.request('cart', {
+      if (!sessionId) {
+        throw new Error('Session ID é obrigatório para limpar o carrinho');
+      }
+      
+      const response = await apiService.request(CART_ENDPOINT, {
         method: 'DELETE',
         headers: {
           'X-Session-ID': sessionId
         }
       });
+      
       return response;
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
+      
+      // Se for um erro 404, o carrinho já está vazio, então podemos considerar como sucesso
+      if (error.response?.status === 404) {
+        console.log('Carrinho já está vazio');
+        return { success: true, message: 'Carrinho já está vazio' };
+      }
+      
       throw error;
     }
   },

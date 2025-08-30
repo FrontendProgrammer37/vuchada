@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import cartService from '../services/cartService';
 
 const CartContext = createContext();
@@ -11,14 +11,17 @@ export const CartProvider = ({ children }) => {
     total: 0,
     itemCount: 0
   });
+  
+  // Inicializa o sessionId a partir do localStorage ou gera um novo
   const [sessionId, setSessionId] = useState(() => {
-    // Tenta obter o sessionId do localStorage, se não existir, gera um novo
-    return localStorage.getItem('sessionId') || `sess_${Math.random().toString(36).substr(2, 9)}`;
+    const savedSessionId = localStorage.getItem('sessionId');
+    return savedSessionId || `sess_${Math.random().toString(36).substr(2, 9)}`;
   });
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Salva o sessionId no localStorage quando ele mudar
+  // Salva o sessionId no localStorage sempre que ele mudar
   useEffect(() => {
     if (sessionId) {
       localStorage.setItem('sessionId', sessionId);
@@ -26,7 +29,7 @@ export const CartProvider = ({ children }) => {
   }, [sessionId]);
 
   // Atualiza o estado do carrinho
-  const updateCartState = (cartData) => {
+  const updateCartState = useCallback((cartData) => {
     setCart({
       items: cartData.items || [],
       subtotal: cartData.subtotal || 0,
@@ -34,10 +37,10 @@ export const CartProvider = ({ children }) => {
       total: cartData.total || 0,
       itemCount: cartData.items ? cartData.items.reduce((sum, item) => sum + (item.quantity || 0), 0) : 0
     });
-  };
+  }, []);
 
   // Carregar carrinho do servidor
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     try {
       setLoading(true);
       const cartData = await cartService.getCart();
@@ -45,13 +48,15 @@ export const CartProvider = ({ children }) => {
     } catch (err) {
       setError(err.message || 'Erro ao carregar carrinho');
       console.error('Erro ao carregar carrinho:', err);
+      // Se o carrinho não existir, limpa o estado local
+      updateCartState({ items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 });
     } finally {
       setLoading(false);
     }
-  };
+  }, [updateCartState]);
 
   // Adicionar item ao carrinho
-  const addToCart = async (productId, quantity = 1) => {
+  const addToCart = useCallback(async (productId, quantity = 1) => {
     try {
       setLoading(true);
       await cartService.addItem(productId, quantity);
@@ -63,10 +68,10 @@ export const CartProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadCart]);
 
   // Remover item do carrinho
-  const removeFromCart = async (productId) => {
+  const removeFromCart = useCallback(async (productId) => {
     try {
       setLoading(true);
       await cartService.removeItem(productId);
@@ -78,11 +83,16 @@ export const CartProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadCart]);
 
   // Atualizar quantidade de um item no carrinho
-  const updateItemQuantity = async (productId, quantity) => {
+  const updateItemQuantity = useCallback(async (productId, quantity) => {
     try {
+      if (quantity <= 0) {
+        await removeFromCart(productId);
+        return;
+      }
+      
       setLoading(true);
       await cartService.updateItemQuantity(productId, quantity);
       await loadCart();
@@ -93,14 +103,14 @@ export const CartProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadCart, removeFromCart]);
 
   // Limpar carrinho
-  const clearCart = async () => {
+  const clearCart = useCallback(async () => {
     try {
       setLoading(true);
       await cartService.clearCart(sessionId);
-      setCart({
+      updateCartState({
         items: [],
         subtotal: 0,
         tax_amount: 0,
@@ -108,20 +118,33 @@ export const CartProvider = ({ children }) => {
         itemCount: 0
       });
     } catch (err) {
+      // Se o carrinho já estiver vazio, apenas atualiza o estado local
+      if (err.response?.status === 404) {
+        updateCartState({
+          items: [],
+          subtotal: 0,
+          tax_amount: 0,
+          total: 0,
+          itemCount: 0
+        });
+        return;
+      }
+      
       setError(err.message || 'Erro ao limpar carrinho');
       console.error('Erro ao limpar carrinho:', err);
       throw err;
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId, updateCartState]);
 
   // Finalizar compra
-  const checkout = async (paymentMethod, customerId = null, notes = '') => {
+  const checkout = useCallback(async (paymentMethod, customerId = null, notes = '') => {
     try {
       setLoading(true);
       const result = await cartService.checkout(paymentMethod, customerId, notes);
-      await clearCart(); // Limpa o carrinho após finalizar a compra
+      // Limpa o carrinho após finalizar a compra
+      await clearCart();
       return result;
     } catch (err) {
       setError(err.message || 'Erro ao finalizar compra');
@@ -130,7 +153,7 @@ export const CartProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clearCart]);
 
   // Valor do contexto
   const value = {
