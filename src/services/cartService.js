@@ -2,23 +2,39 @@ import apiService from './api';
 
 // Função auxiliar para obter o sessionId
 const getSessionId = () => {
-  return localStorage.getItem('sessionId') || '';
+  let sessionId = localStorage.getItem('sessionId');
+  
+  // Se não existir um sessionId, gera um novo
+  if (!sessionId) {
+    sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('sessionId', sessionId);
+    console.log('Novo sessionId gerado:', sessionId);
+  }
+  
+  return sessionId;
 };
+
+const CART_BASE_URL = 'cart';
 
 const cartService = {
   // Adicionar item ao carrinho
   async addItem(productId, quantity = 1) {
     try {
-      const response = await apiService.request('cart/add', {
+      console.log('Adicionando item ao carrinho:', { productId, quantity });
+      const sessionId = getSessionId();
+      
+      const response = await apiService.request(`${CART_BASE_URL}/add`, {
         method: 'POST',
         headers: {
-          'X-Session-ID': getSessionId()
+          'X-Session-ID': sessionId
         },
         body: {
           product_id: productId,
           quantity: quantity
         }
       });
+      
+      console.log('Resposta ao adicionar item:', response);
       return response;
     } catch (error) {
       console.error('Erro ao adicionar item ao carrinho:', error);
@@ -29,18 +45,25 @@ const cartService = {
   // Obter carrinho atual
   async getCart() {
     try {
-      const response = await apiService.request('cart', {
+      const sessionId = getSessionId();
+      console.log('Obtendo carrinho. SessionId:', sessionId);
+      
+      const response = await apiService.request(CART_BASE_URL, {
         method: 'GET',
         headers: {
-          'X-Session-ID': getSessionId()
+          'X-Session-ID': sessionId
         }
       });
+      
+      console.log('Carrinho obtido:', response);
       return response;
     } catch (error) {
       // Se o carrinho não existir (404), retorna um carrinho vazio
       if (error.status === 404) {
+        console.log('Carrinho não encontrado, retornando carrinho vazio');
         return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
       }
+      
       console.error('Erro ao buscar carrinho:', error);
       throw error;
     }
@@ -49,16 +72,20 @@ const cartService = {
   // Atualizar quantidade de um item
   async updateItemQuantity(productId, quantity) {
     try {
-      const response = await apiService.request('cart/update', {
+      console.log('Atualizando quantidade:', { productId, quantity });
+      const sessionId = getSessionId();
+      
+      const response = await apiService.request(`${CART_BASE_URL}/update`, {
         method: 'PUT',
         headers: {
-          'X-Session-ID': getSessionId()
+          'X-Session-ID': sessionId
         },
         body: {
           product_id: productId,
           quantity: quantity
         }
       });
+      
       return response;
     } catch (error) {
       console.error('Erro ao atualizar quantidade:', error);
@@ -69,12 +96,16 @@ const cartService = {
   // Remover item do carrinho
   async removeItem(productId) {
     try {
-      const response = await apiService.request(`cart/items/${productId}`, {
+      console.log('Removendo item do carrinho:', productId);
+      const sessionId = getSessionId();
+      
+      const response = await apiService.request(`${CART_BASE_URL}/items/${productId}`, {
         method: 'DELETE',
         headers: {
-          'X-Session-ID': getSessionId()
+          'X-Session-ID': sessionId
         }
       });
+      
       return response;
     } catch (error) {
       console.error('Erro ao remover item do carrinho:', error);
@@ -85,12 +116,16 @@ const cartService = {
   // Limpar carrinho
   async clearCart() {
     try {
-      const response = await apiService.request('cart', {
+      console.log('Limpando carrinho');
+      const sessionId = getSessionId();
+      
+      const response = await apiService.request(CART_BASE_URL, {
         method: 'DELETE',
         headers: {
-          'X-Session-ID': getSessionId()
+          'X-Session-ID': sessionId
         }
       });
+      
       return response;
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
@@ -119,10 +154,13 @@ const cartService = {
   // Finalizar compra/checkout
   async checkout(paymentMethod, customerId = null, notes = '') {
     try {
-      const response = await apiService.request('cart/checkout', {
+      console.log('Finalizando compra:', { paymentMethod, customerId, notes });
+      const sessionId = getSessionId();
+      
+      const response = await apiService.request(`${CART_BASE_URL}/checkout`, {
         method: 'POST',
         headers: {
-          'X-Session-ID': getSessionId()
+          'X-Session-ID': sessionId
         },
         body: {
           payment_method: paymentMethod,
@@ -130,6 +168,7 @@ const cartService = {
           notes: notes
         }
       });
+      
       return response;
     } catch (error) {
       console.error('Erro ao finalizar compra:', error);

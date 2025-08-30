@@ -39,13 +39,12 @@ class ApiService {
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
         const url = `${this.baseURL}/${normalizedEndpoint}`;
         
-        // Se body for um objeto e não for FormData, converte para JSON
-        let body = options.body;
-        
         // Obtém os headers personalizados das opções, se existirem
         const customHeaders = options.headers || {};
         const headers = this.getHeaders(customHeaders);
         
+        // Se body for um objeto e não for FormData, converte para JSON
+        let body = options.body;
         if (body && typeof body === 'object' && !(body instanceof FormData)) {
             body = JSON.stringify(body);
         } else if (body instanceof FormData) {
@@ -62,6 +61,7 @@ class ApiService {
         };
 
         try {
+            console.log(`Enviando requisição para: ${url}`, { config });
             const response = await fetch(url, config);
             
             // Se a resposta for 204 (No Content), retorna null
@@ -70,11 +70,18 @@ class ApiService {
             }
             
             // Tenta fazer o parse da resposta como JSON
-            const data = await response.json().catch(() => ({}));
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                // Se não for possível fazer o parse como JSON, retorna o texto
+                const text = await response.text();
+                throw new Error(`Resposta inválida do servidor: ${text}`);
+            }
             
             // Se a resposta não for bem-sucedida, lança um erro
             if (!response.ok) {
-                const error = new Error(data.message || 'Erro na requisição');
+                const error = new Error(data.detail || data.message || 'Erro na requisição');
                 error.status = response.status;
                 error.response = data;
                 throw error;
@@ -91,6 +98,11 @@ class ApiService {
                 if (window.location.pathname !== '/login') {
                     window.location.href = '/login';
                 }
+            }
+            
+            // Se o erro não tiver status, adiciona um status padrão
+            if (!error.status) {
+                error.status = 0;
             }
             
             throw error;
