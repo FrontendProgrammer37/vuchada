@@ -6,12 +6,12 @@ const ENV = {
     API_URL: '/api',
   },
   production: {
-    // Em produção, usamos a URL direta da API
+    // Em produção, usamos a URL direta da API com HTTPS
     API_URL: 'https://backend-production-f01c.up.railway.app/api/v1',
   }
 };
 
-// Verifica se estamos em desenvolvimento ou produção
+// Determina o ambiente atual
 const env = import.meta.env.DEV ? 'development' : 'production';
 
 // Exporta as configurações do ambiente atual

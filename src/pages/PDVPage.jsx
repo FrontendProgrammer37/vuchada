@@ -3,6 +3,7 @@ import { Plus, Minus, X, Check, ShoppingCart, User, CreditCard } from 'lucide-re
 import cartService from '../services/cartService';
 import checkoutService from '../services/checkoutService';
 import apiService from '../services/api';
+import toast from '../components/Toast';
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
@@ -209,26 +210,32 @@ const PDVPage = () => {
 
   // Função para finalizar a venda
   const handleCheckout = async () => {
-    if (cart.items.length === 0) {
-      alert('Adicione itens ao carrinho antes de finalizar a venda');
-      return;
-    }
-
-    setIsCheckingOut(true);
     try {
-      const result = await checkoutService.processCheckout({
+      setIsCheckingOut(true);
+      
+      // Get current cart items
+      const cartItems = cart.items.map(item => ({
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.price
+      }));
+
+      const checkoutData = {
         payment_method: paymentMethod,
-        customer_id: customerId,
         amount_received: cart.total, // Valor total do carrinho
-        notes: ''
-      });
+        customer_id: customerId,
+        notes: '',
+        items: cartItems
+      };
+
+      const result = await checkoutService.processCheckout(checkoutData);
       
       // Limpar carrinho após venda concluída
       await cartService.clearCart();
       setCart({ items: [], total: 0 });
       
       // Mostrar recibo ou mensagem de sucesso
-      alert(`Venda #${result.sale_number} finalizada com sucesso!`);
+      toast.success(`Venda #${result.sale_number} finalizada com sucesso!`);
       
       // Fechar o carrinho após a venda (opcional)
       if (isMobile) {
@@ -237,7 +244,7 @@ const PDVPage = () => {
       
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
-      alert(`Erro ao finalizar venda: ${error.message || 'Tente novamente mais tarde'}`);
+      toast.error(error.message || 'Erro ao processar o pagamento');
     } finally {
       setIsCheckingOut(false);
     }
