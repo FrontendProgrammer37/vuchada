@@ -31,7 +31,7 @@ const saleService = {
     if (status) params.append('status', status);
 
     try {
-      const response = await apiService.request(`sales?${params.toString()}`);
+      const response = await apiService.get(`sales?${params.toString()}`);
       // Garante que sempre retornamos um objeto com data e total
       if (Array.isArray(response)) {
         return { data: response, total: response.length };
@@ -55,7 +55,7 @@ const saleService = {
    */
   async getSaleDetails(saleId) {
     try {
-      return await apiService.request(`sales/${saleId}`);
+      return await apiService.get(`sales/${saleId}`);
     } catch (error) {
       console.error('Erro ao obter detalhes da venda:', error);
       throw error;
@@ -70,10 +70,7 @@ const saleService = {
    */
   async cancelSale(saleId, reason) {
     try {
-      return await apiService.request(`sales/${saleId}/cancel`, {
-        method: 'POST',
-        body: { reason }
-      });
+      return await apiService.post(`sales/${saleId}/cancel`, { reason });
     } catch (error) {
       console.error('Erro ao cancelar venda:', error);
       throw error;
@@ -91,7 +88,7 @@ const saleService = {
   async generateSalesReport(filters) {
     try {
       const params = new URLSearchParams(filters);
-      return await apiService.request(`sales/report?${params.toString()}`);
+      return await apiService.get(`sales/report?${params.toString()}`);
     } catch (error) {
       console.error('Erro ao gerar relatório de vendas:', error);
       throw error;

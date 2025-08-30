@@ -3,17 +3,16 @@
 const ENV = {
   development: {
     // No desenvolvimento, usamos o proxy configurado no Vite
-    API_URL: 'http://localhost:5173/api',
+    API_URL: '/api',
   },
   production: {
     // Em produção, usamos a URL direta da API
     API_URL: 'https://backend-production-f01c.up.railway.app/api/v1',
-  },
+  }
 };
 
-// Determina o ambiente atual baseado na variável de ambiente VITE_APP_ENV
-// Se não estiver definida, assume desenvolvimento
-const currentEnv = import.meta.env.VITE_APP_ENV || 'development';
+// Verifica se estamos em desenvolvimento ou produção
+const env = import.meta.env.DEV ? 'development' : 'production';
 
 // Exporta as configurações do ambiente atual
-export default ENV[currentEnv];
+export default ENV[env];

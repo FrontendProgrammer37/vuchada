@@ -3,7 +3,7 @@ import config from '../config/env';
 
 class ApiService {
     constructor() {
-        this.baseURL = config.API_URL; // Já inclui /api/v1 no ambiente de produção
+        this.baseURL = config.API_URL;
         this.token = localStorage.getItem('token');
     }
 
@@ -11,6 +11,7 @@ class ApiService {
     getHeaders() {
         const headers = {
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
         };
         
         if (this.token) {
@@ -32,18 +33,17 @@ class ApiService {
         localStorage.removeItem('token');
     }
 
-    // Função genérica para fazer requisições
+    // Método genérico para fazer requisições
     async request(endpoint, options = {}) {
-        // Remove a barra inicial se existir para evitar duplicação
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        const url = `${this.baseURL}/${normalizedEndpoint}`;
+        const url = `${this.baseURL}${this.baseURL.endsWith('/') ? '' : '/'}${normalizedEndpoint}`;
         
         const config = {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+            mode: 'cors',
+            credentials: 'include',
         };
 
         // Se o body for um objeto, converte para JSON
@@ -54,45 +54,56 @@ class ApiService {
         try {
             const response = await fetch(url, config);
             
-            // Clona a resposta para permitir múltiplas leituras
-            const responseClone = response.clone();
-            
-            // Se a resposta não for bem-sucedida, tenta extrair a mensagem de erro
+            // Se a resposta for 204 (No Content), retorna null
+            if (response.status === 204) {
+                return null;
+            }
+
+            const data = await response.json();
+
             if (!response.ok) {
-                let errorMessage = 'Erro na requisição';
-                try {
-                    const errorData = await responseClone.json();
-                    errorMessage = errorData.detail || errorData.message || errorMessage;
-                } catch (e) {
-                    // Se não conseguir extrair JSON, usa o status text
-                    errorMessage = response.statusText || errorMessage;
-                }
-                
-                const error = new Error(errorMessage);
+                const error = new Error(data.message || 'Erro na requisição');
                 error.status = response.status;
+                error.data = data;
                 throw error;
             }
-            
-            // Tenta fazer parse do JSON
-            try {
-                return await response.json();
-            } catch (e) {
-                // Se não for JSON, retorna o texto da resposta
-                return response.text();
-            }
+
+            return data;
         } catch (error) {
             console.error(`Erro na requisição para ${url}:`, error);
             throw error;
         }
     }
 
+    // Métodos HTTP
+    async get(endpoint) {
+        return this.request(endpoint);
+    }
+
+    async post(endpoint, data) {
+        return this.request(endpoint, {
+            method: 'POST',
+            body: data
+        });
+    }
+
+    async put(endpoint, data) {
+        return this.request(endpoint, {
+            method: 'PUT',
+            body: data
+        });
+    }
+
+    async delete(endpoint) {
+        return this.request(endpoint, {
+            method: 'DELETE'
+        });
+    }
+
     // ===== AUTENTICAÇÃO =====
     
     async register(userData) {
-        return this.request('auth/register', {
-            method: 'POST',
-            body: JSON.stringify(userData),
-        });
+        return this.post('auth/register', userData);
     }
 
     async login(username, password) {
@@ -101,12 +112,10 @@ class ApiService {
         formData.append('password', password);
 
         // O endpoint de login espera 'x-www-form-urlencoded', então não usamos o header padrão
-        const data = await this.request('auth/login', {
-            method: 'POST',
+        const data = await this.post('auth/login', formData.toString(), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData.toString(),
+            }
         });
 
         this.setToken(data.access_token);
@@ -118,37 +127,29 @@ class ApiService {
     }
 
     async getCurrentUser() {
-        return this.request('auth/me');
+        return this.get('auth/me');
     }
 
     // ===== CATEGORIAS =====
     
     async getCategories() {
-        return this.request('categories/');
+        return this.get('categories/');
     }
 
     async getCategory(id) {
-        return this.request(`categories/${id}`);
+        return this.get(`categories/${id}`);
     }
 
     async createCategory(categoryData) {
-        return this.request('categories/', {
-            method: 'POST',
-            body: JSON.stringify(categoryData),
-        });
+        return this.post('categories/', categoryData);
     }
 
     async updateCategory(id, categoryData) {
-        return this.request(`categories/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(categoryData),
-        });
+        return this.put(`categories/${id}`, categoryData);
     }
 
     async deleteCategory(id) {
-        return this.request(`categories/${id}`, {
-            method: 'DELETE',
-        });
+        return this.delete(`categories/${id}`);
     }
 
     // ===== PRODUTOS =====
@@ -163,7 +164,7 @@ class ApiService {
         const queryString = params.toString();
         const endpoint = `products/${queryString ? `?${queryString}` : ''}`;
         
-        const data = await this.request(endpoint);
+        const data = await this.get(endpoint);
         
         // Mapear os campos do backend para o formato esperado pelo frontend
         return data.map(product => ({
@@ -182,7 +183,7 @@ class ApiService {
     }
 
     async getProduct(id) {
-        const product = await this.request(`products/${id}`);
+        const product = await this.get(`products/${id}`);
         
         // Mapear os campos do backend para o formato esperado pelo frontend
         return {
@@ -228,11 +229,7 @@ class ApiService {
         console.log('Enviando dados para a API:', JSON.stringify(formattedData, null, 2));
 
         try {
-            const response = await this.request('products/', {
-                method: 'POST',
-                headers: this.getHeaders(),
-                body: JSON.stringify(formattedData),
-            });
+            const response = await this.post('products/', formattedData);
             console.log('Resposta da API:', response);
             return response;
         } catch (error) {
@@ -280,11 +277,7 @@ class ApiService {
         }, null, 2));
 
         try {
-            const response = await this.request(`products/${id}`, {
-                method: 'PUT',
-                headers: this.getHeaders(),
-                body: JSON.stringify(formattedData),
-            });
+            const response = await this.put(`products/${id}`, formattedData);
             
             console.log('Produto atualizado com sucesso:', response);
             return response;
@@ -309,10 +302,7 @@ class ApiService {
         console.log(`Solicitando exclusão do produto com ID: ${id}`);
 
         try {
-            const response = await this.request(`products/${id}`, {
-                method: 'DELETE',
-                headers: this.getHeaders()
-            });
+            const response = await this.delete(`products/${id}`);
             
             console.log('Produto excluído com sucesso:', response);
             return response;
@@ -329,9 +319,7 @@ class ApiService {
     }
 
     async deleteAllProducts() {
-        return this.request('products/delete-all', {
-            method: 'DELETE',
-        });
+        return this.delete('products/delete-all');
     }
 
     // ===== FUNCIONÁRIOS =====
@@ -345,7 +333,7 @@ class ApiService {
      */
     async getEmployees({ page = 1, size = 10 } = {}) {
         const query = new URLSearchParams({ page, size });
-        return this.request(`employees/?${query}`);
+        return this.get(`employees/?${query}`);
     }
 
     /**
@@ -354,7 +342,7 @@ class ApiService {
      * @returns {Promise<Object>} Dados do funcionário
      */
     async getEmployee(id) {
-        return this.request(`employees/${id}`);
+        return this.get(`employees/${id}`);
     }
 
     /**
@@ -371,10 +359,7 @@ class ApiService {
      * @returns {Promise<Object>} Dados do funcionário criado
      */
     async createEmployee(employeeData) {
-        return this.request('employees/', {
-            method: 'POST',
-            body: JSON.stringify(employeeData)
-        });
+        return this.post('employees/', employeeData);
     }
 
     /**
@@ -384,10 +369,7 @@ class ApiService {
      * @returns {Promise<Object>} Dados do funcionário atualizado
      */
     async updateEmployee(id, employeeData) {
-        return this.request(`employees/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(employeeData)
-        });
+        return this.put(`employees/${id}`, employeeData);
     }
 
     /**
@@ -396,96 +378,73 @@ class ApiService {
      * @returns {Promise<Object>} Resultado da operação
      */
     async deleteEmployee(id) {
-        return this.request(`employees/${id}`, {
-            method: 'DELETE'
-        });
+        return this.delete(`employees/${id}`);
     }
 
     // ===== VENDAS =====
     
     async getSales() {
-        return this.request('sales/');
+        return this.get('sales/');
     }
 
     async getSale(id) {
-        return this.request(`sales/${id}`);
+        return this.get(`sales/${id}`);
     }
 
     async createSale(saleData) {
         // Remover referência ao cliente se existir
         const { customer_id, ...saleDataSemCliente } = saleData;
-        return this.request('sales/', {
-            method: 'POST',
-            body: JSON.stringify(saleDataSemCliente),
-        });
+        return this.post('sales/', saleDataSemCliente);
     }
 
     async updateSale(id, saleData) {
-        return this.request(`sales/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(saleData),
-        });
+        return this.put(`sales/${id}`, saleData);
     }
 
     async deleteSale(id) {
-        return this.request(`sales/${id}`, {
-            method: 'DELETE',
-        });
+        return this.delete(`sales/${id}`);
     }
 
     // ===== INVENTÁRIO =====
     
     async getInventoryMovements() {
-        return this.request('inventory/');
+        return this.get('inventory/');
     }
 
     async getInventoryMovement(id) {
-        return this.request(`inventory/${id}`);
+        return this.get(`inventory/${id}`);
     }
 
     async createInventoryMovement(movementData) {
-        return this.request('inventory/', {
-            method: 'POST',
-            body: JSON.stringify(movementData),
-        });
+        return this.post('inventory/', movementData);
     }
 
     // ===== USUÁRIOS =====
     
     async getUsers() {
-        return this.request('users/');
+        return this.get('users/');
     }
 
     async getUser(id) {
-        return this.request(`users/${id}`);
+        return this.get(`users/${id}`);
     }
 
     async createUser(userData) {
-        return this.request('users/', {
-            method: 'POST',
-            body: JSON.stringify(userData),
-        });
+        return this.post('users/', userData);
     }
 
     async updateUser(id, userData) {
-        return this.request(`users/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(userData),
-        });
+        return this.put(`users/${id}`, userData);
     }
 
     async deleteUser(id) {
-        return this.request(`users/${id}`, {
-            method: 'DELETE',
-        });
+        return this.delete(`users/${id}`);
     }
 
     // ===== IMPRESSÃO =====
     
     async printReceipt(saleId) {
-        return this.request(`sales/${saleId}/print`, {
-            method: 'POST',
-        });
+        return this.post(`sales/${saleId}/print`);
     }
 }
 
