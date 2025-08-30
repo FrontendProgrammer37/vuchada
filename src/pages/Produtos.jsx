@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
 import apiService from '../services/api';
+import toast from '../utils/toast';
 
 const Produtos = () => {
     const [products, setProducts] = useState([]);
@@ -60,7 +61,7 @@ const Produtos = () => {
         const matchesSearch = productName.includes(searchTermLower) ||
                             productSku.includes(searchTermLower);
         const matchesCategory = !selectedCategory || product.category_id === parseInt(selectedCategory);
-        return matchesSearch && matchesCategory;
+        return matchesSearch && matchesCategory && product.is_active;
     });
 
     // Abrir modal para criar/editar produto
@@ -156,16 +157,52 @@ const Produtos = () => {
         setProductToDelete(null);
     };
     
-    // Deletar produto
+    // Deletar produto (soft delete)
     const confirmDeleteProduct = async () => {
         try {
             await apiService.deleteProduct(productToDelete);
-            loadData(); // Recarregar dados
+            // Atualizar o estado local para refletir a desativação
+            setProducts(products.map(p => 
+                p.id === productToDelete ? { ...p, is_active: false } : p
+            ));
             setError(null);
             closeDeleteModal();
+            toast.success('Produto desativado com sucesso');
         } catch (err) {
-            setError('Erro ao deletar produto: ' + err.message);
+            setError('Erro ao desativar produto: ' + (err.response?.data?.detail || err.message));
+            console.error('Erro ao desativar produto:', err);
             closeDeleteModal();
+        }
+    };
+
+    // Ativar produto
+    const activateProduct = async (productId) => {
+        try {
+            await apiService.activateProduct(productId);
+            // Atualizar o estado local para refletir a ativação
+            setProducts(products.map(p => 
+                p.id === productId ? { ...p, is_active: true } : p
+            ));
+            toast.success('Produto ativado com sucesso');
+        } catch (err) {
+            setError('Erro ao ativar produto: ' + (err.response?.data?.detail || err.message));
+            console.error('Erro ao ativar produto:', err);
+        }
+    };
+
+    // Deletar todos os produtos (soft delete)
+    const confirmDeleteAllProducts = async () => {
+        try {
+            await apiService.deleteAllProducts();
+            // Atualizar o estado local para refletir a desativação de todos os produtos
+            setProducts(products.map(p => ({ ...p, is_active: false })));
+            setError(null);
+            closeDeleteAllModal();
+            toast.success('Todos os produtos foram desativados');
+        } catch (err) {
+            setError('Erro ao desativar produtos: ' + (err.response?.data?.detail || err.message));
+            console.error('Erro ao desativar produtos:', err);
+            closeDeleteAllModal();
         }
     };
 
@@ -179,18 +216,6 @@ const Produtos = () => {
     const closeDeleteAllModal = () => {
         setShowDeleteAllModal(false);
     };
-    
-    const confirmDeleteAllProducts = async () => {
-        try {
-            await apiService.deleteAllProducts();
-            loadData(); // Recarregar dados
-            setError(null);
-            closeDeleteAllModal();
-        } catch (err) {
-            setError('Erro ao deletar todos os produtos: ' + err.message);
-            closeDeleteAllModal();
-        }
-    };
 
     // Formatar preço
     const formatPrice = (price) => {
@@ -199,6 +224,45 @@ const Produtos = () => {
             currency: 'MZN'
         }).format(price);
     };
+
+    // Render status badge
+    const renderStatusBadge = (isActive) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+        }`}>
+            {isActive ? 'Ativo' : 'Inativo'}
+        </span>
+    );
+
+    // Render action buttons based on product status
+    const renderProductActions = (product) => (
+        <div className="flex items-center space-x-2">
+            <button
+                onClick={() => openModal(product)}
+                className="text-blue-600 hover:text-blue-900"
+                title="Editar"
+            >
+                <Edit className="h-4 w-4" />
+            </button>
+            {product.is_active ? (
+                <button
+                    onClick={() => openDeleteModal(product.id)}
+                    className="text-red-600 hover:text-red-900"
+                    title="Desativar"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
+            ) : (
+                <button
+                    onClick={() => activateProduct(product.id)}
+                    className="text-green-600 hover:text-green-900"
+                    title="Ativar"
+                >
+                    <Eye className="h-4 w-4" />
+                </button>
+            )}
+        </div>
+    );
 
     if (loading) {
         return (
@@ -356,13 +420,16 @@ const Produtos = () => {
                                     Categoria
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Status
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Ações
                                 </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {filteredProducts.map((product) => (
-                                <tr key={product.id} className="hover:bg-gray-50">
+                                <tr key={product.id} className={!product.is_active ? 'bg-gray-50' : ''}>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div>
                                             <div className="text-sm font-medium text-gray-900">
@@ -392,21 +459,11 @@ const Produtos = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {categories.find(c => c.id === product.category_id)?.name || '-'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <div className="flex space-x-2">
-                                            <button
-                                                onClick={() => openModal(product)}
-                                                className="text-blue-600 hover:text-blue-900"
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => openDeleteModal(product.id)}
-                                                className="text-red-600 hover:text-red-900"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        {renderStatusBadge(product.is_active)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        {renderProductActions(product)}
                                     </td>
                                 </tr>
                             ))}
@@ -418,10 +475,10 @@ const Produtos = () => {
                 <div className="lg:hidden">
                     <div className="p-4 space-y-4">
                         {filteredProducts.map((product) => (
-                            <div key={product.id} className="border rounded-lg p-4 space-y-3">
+                            <div key={product.id} className={`bg-white p-4 rounded-lg shadow ${!product.is_active ? 'opacity-70' : ''}`}>
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <h3 className="font-medium text-gray-900">{product.name}</h3>
+                                        <h3 className="text-lg font-medium text-gray-900">{product.name}</h3>
                                         <p className="text-sm text-gray-500">{product.sku}</p>
                                     </div>
                                     <div className="text-right">
@@ -445,21 +502,12 @@ const Produtos = () => {
                                     <span>Min: {product.min_stock}</span>
                                 </div>
                                 
+                                <div className="mt-2">
+                                    {renderStatusBadge(product.is_active)}
+                                </div>
+                                
                                 <div className="flex space-x-2 pt-2">
-                                    <button
-                                        onClick={() => openModal(product)}
-                                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm flex items-center justify-center gap-2"
-                                    >
-                                        <Edit className="h-4 w-4" />
-                                        Editar
-                                    </button>
-                                    <button
-                                        onClick={() => openDeleteModal(product.id)}
-                                        className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-sm flex items-center justify-center gap-2"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                        Deletar
-                                    </button>
+                                    {renderProductActions(product)}
                                 </div>
                             </div>
                         ))}

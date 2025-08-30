@@ -358,6 +358,39 @@ class ApiService {
         });
     }
 
+    /**
+     * Ativa um produto previamente desativado (soft delete)
+     * @param {number|string} id - ID do produto a ser ativado
+     * @returns {Promise<Object>} Dados do produto ativado
+     */
+    async activateProduct(id) {
+        // Validação do ID
+        if (!id) {
+            throw new Error('ID do produto é obrigatório para ativação');
+        }
+
+        console.log(`Ativando produto com ID: ${id}`);
+
+        try {
+            const response = await this.request(`products/${id}/activate`, {
+                method: 'POST',
+                headers: this.getHeaders()
+            });
+            
+            console.log('Produto ativado com sucesso:', response);
+            return response;
+            
+        } catch (error) {
+            console.error('Erro ao ativar produto:', {
+                id,
+                error: error.message,
+                status: error.status,
+                response: error.response
+            });
+            throw new Error(`Falha ao ativar produto: ${error.message}`);
+        }
+    }
+
     // ===== FUNCIONÁRIOS =====
     
     /**

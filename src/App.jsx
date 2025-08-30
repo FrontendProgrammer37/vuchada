@@ -134,9 +134,21 @@ const AppContent = () => {
 const App = () => {
   return (
     <AuthProvider>
-      <ToastContainer position="top-right" autoClose={5000} />
       <Router>
-        <AppContent />
+        <div className="min-h-screen bg-gray-100">
+          <AppContent />
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
+        </div>
       </Router>
     </AuthProvider>
   );
