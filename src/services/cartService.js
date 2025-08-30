@@ -119,7 +119,7 @@ const cartService = {
       const response = await apiService.request(
         `${CART_BASE_URL}/cart/items/${productId}?session_id=${sessionId}`,
         {
-          method: 'PUT',
+          method: 'PATCH',
           body: { quantity }
         }
       );
