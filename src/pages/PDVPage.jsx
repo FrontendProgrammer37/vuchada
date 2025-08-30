@@ -3,7 +3,7 @@ import { Plus, Minus, X, Check, ShoppingCart, User, CreditCard } from 'lucide-re
 import cartService from '../services/cartService';
 import checkoutService from '../services/checkoutService';
 import apiService from '../services/api';
-import toast from '../components/Toast';
+import Toast from '../components/Toast';
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
@@ -120,6 +120,12 @@ const PDVPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
   const [customerId, setCustomerId] = useState(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+
+  const showToast = (message, type = 'info') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ ...toast, show: false }), 5000);
+  };
 
   // Buscar produtos da API
   useEffect(() => {
@@ -235,7 +241,7 @@ const PDVPage = () => {
       setCart({ items: [], total: 0 });
       
       // Mostrar recibo ou mensagem de sucesso
-      toast.success(`Venda #${result.sale_number} finalizada com sucesso!`);
+      showToast('Venda realizada com sucesso!', 'success');
       
       // Fechar o carrinho após a venda (opcional)
       if (isMobile) {
@@ -244,7 +250,7 @@ const PDVPage = () => {
       
     } catch (error) {
       console.error('Erro ao finalizar venda:', error);
-      toast.error(error.message || 'Erro ao processar o pagamento');
+      showToast(error.message || 'Erro ao processar o pagamento', 'error');
     } finally {
       setIsCheckingOut(false);
     }
@@ -324,6 +330,13 @@ const PDVPage = () => {
 
   return (
     <div className="container mx-auto p-4 md:p-6">
+      {toast.show && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
+      )}
       <div className="flex justify-between items-center mb-6">
         <div className="bg-white rounded-lg shadow-sm p-4">
           <h1 className="text-2xl font-bold text-gray-800">Nova Venda</h1>
