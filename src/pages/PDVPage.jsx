@@ -398,40 +398,41 @@ const PDVPage = () => {
                         </div>
 
                         {paymentMethod === 'DINHEIRO' && (
-                          <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Valor Recebido
-                            </label>
-                            <input
-                              type="number"
-                              value={amountReceived}
-                              onChange={(e) => setAmountReceived(e.target.value)}
-                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                              placeholder="0.00"
-                              min="0"
-                              step="0.01"
-                            />
-                            {parseFloat(amountReceived || 0) < cartTotal && paymentMethod === 'DINHEIRO' && (
-                              <p className="mt-1 text-sm text-red-600">
-                                Valor insuficiente
-                              </p>
+                          <>
+                            <div className="mb-2">
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Valor Recebido
+                              </label>
+                              <input
+                                type="number"
+                                value={amountReceived}
+                                onChange={(e) => setAmountReceived(e.target.value)}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="0.00"
+                                min="0"
+                                step="0.01"
+                              />
+                              {parseFloat(amountReceived || 0) < cartTotal && (
+                                <p className="mt-1 text-sm text-red-600">
+                                  Valor insuficiente
+                                </p>
+                              )}
+                            </div>
+                            {parseFloat(amountReceived || 0) > 0 && (
+                              <div className="flex justify-between items-center mb-4">
+                                <span className="font-medium">Troco:</span>
+                                <span className="font-bold text-green-600">
+                                  {formatCurrency(parseFloat(amountReceived) - cartTotal)}
+                                </span>
+                              </div>
                             )}
-                          </div>
+                          </>
                         )}
 
                         <div className="flex justify-between items-center mb-2">
                           <span className="font-medium">Total:</span>
                           <span className="font-bold">{formatCurrency(cartTotal)}</span>
                         </div>
-                        
-                        {paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) > 0 && (
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium">Troco:</span>
-                            <span className="font-bold">
-                              {formatCurrency(parseFloat(amountReceived || 0) - cartTotal)}
-                            </span>
-                          </div>
-                        )}
 
                         <button
                           onClick={handleCheckout}
@@ -439,18 +440,21 @@ const PDVPage = () => {
                             cart.length === 0 || 
                             (paymentMethod === 'DINHEIRO' && 
                              (isNaN(parseFloat(amountReceived)) || 
-                              parseFloat(amountReceived) < cartTotal))
+                              parseFloat(amountReceived || 0) < cartTotal))
                           }
-                          className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                          className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white mt-4 ${
                             cart.length === 0 || 
                             (paymentMethod === 'DINHEIRO' && 
                              (isNaN(parseFloat(amountReceived)) || 
-                              parseFloat(amountReceived) < cartTotal))
+                              parseFloat(amountReceived || 0) < cartTotal))
                               ? 'bg-gray-400 cursor-not-allowed'
-                              : 'bg-blue-600 hover:bg-blue-700'
+                              : 'bg-green-600 hover:bg-green-700'
                           }`}
                         >
-                          Finalizar Venda
+                          <div className="flex items-center justify-center">
+                            <Check className="mr-2" size={20} />
+                            Finalizar Venda
+                          </div>
                         </button>
                       </div>
                     </div>
