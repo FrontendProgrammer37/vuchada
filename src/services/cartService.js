@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CART_BASE_URL = '/cart';
+const CART_BASE_URL = '/api/v1/cart';
 
 const cartService = {
   /**
@@ -18,22 +18,28 @@ const cartService = {
     try {
       const body = {
         product_id: productId,
-        quantity: quantity
+        quantity: quantity,
+        is_weight_sale: isWeightSale
       };
 
       if (isWeightSale) {
         if (weightInKg === undefined || customPrice === undefined) {
           throw new Error('Para produtos vendidos por peso, é necessário informar o peso e o preço personalizado');
         }
-        body.is_weight_sale = true;
         body.weight_in_kg = weightInKg;
         body.custom_price = customPrice;
       }
 
-      const response = await apiService.request(`${CART_BASE_URL}/add?session_id=${sessionId}`, {
-        method: 'POST',
-        body: body
-      });
+      const response = await apiService.request(
+        `${CART_BASE_URL}/add`,
+        {
+          method: 'POST',
+          body: body,
+          headers: {
+            'X-Session-ID': sessionId
+          }
+        }
+      );
       return response;
     } catch (error) {
       console.error('Erro ao adicionar item ao carrinho:', error);
@@ -48,14 +54,21 @@ const cartService = {
    */
   async getCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_BASE_URL}?session_id=${sessionId}`);
+      const response = await apiService.request(
+        CART_BASE_URL,
+        {
+          headers: {
+            'X-Session-ID': sessionId
+          }
+        }
+      );
       return response;
     } catch (error) {
       if (error.status === 404) {
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+        return { items: [], subtotal: 0, total: 0 };
       }
-      console.error('Erro ao buscar carrinho:', error);
-      throw new Error(error.message || 'Erro ao buscar carrinho');
+      console.error('Erro ao obter carrinho:', error);
+      throw new Error(error.message || 'Erro ao obter carrinho');
     }
   },
 
@@ -68,10 +81,12 @@ const cartService = {
   async removeItem(productId, sessionId = 'default') {
     try {
       const response = await apiService.request(
-        `${CART_BASE_URL}/remove?session_id=${sessionId}`,
+        `${CART_BASE_URL}/cart/items/${productId}`,
         {
-          method: 'POST',
-          body: { product_id: productId }
+          method: 'DELETE',
+          headers: {
+            'X-Session-ID': sessionId
+          }
         }
       );
       return response;
@@ -88,40 +103,51 @@ const cartService = {
    */
   async clearCart(sessionId = 'default') {
     try {
-      // Primeiro, obtém o carrinho atual
-      const cart = await this.getCart(sessionId);
-      
-      // Se o carrinho já estiver vazio, retorna imediatamente
-      if (!cart.items || cart.items.length === 0) {
-        return { success: true, message: 'O carrinho já está vazio' };
-      }
-
-      // Remove cada item individualmente
-      const removePromises = cart.items.map(item => 
-        this.removeItem(item.product_id || item.id, sessionId)
-          .then(() => ({ success: true }))
-          .catch(error => {
-            console.error(`Erro ao remover item ${item.product_id || item.id}:`, error);
-            return { success: false, error };
-          })
+      const response = await apiService.request(
+        `${CART_BASE_URL}/cart`,
+        {
+          method: 'DELETE',
+          headers: {
+            'X-Session-ID': sessionId
+          }
+        }
       );
-
-      const results = await Promise.all(removePromises);
-      const failedRemovals = results.filter(result => !result.success);
-      
-      if (failedRemovals.length > 0) {
-        console.error('Alguns itens não puderam ser removidos:', failedRemovals);
-        throw new Error(`Não foi possível remover ${failedRemovals.length} itens do carrinho`);
-      }
-      
-      return { 
-        success: true, 
-        message: 'Carrinho limpo com sucesso',
-        itemsRemoved: cart.items.length
-      };
+      return response;
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
-      throw new Error(`Erro ao limpar carrinho: ${error.message}`);
+      throw new Error(error.message || 'Erro ao limpar carrinho');
+    }
+  },
+
+  /**
+   * Finaliza a compra (checkout)
+   * @param {Object} checkoutData - Dados do checkout
+   * @param {string} checkoutData.payment_method - Método de pagamento
+   * @param {number} [checkoutData.customer_id] - ID do cliente (opcional)
+   * @param {string} [checkoutData.notes] - Observações adicionais (opcional)
+   * @param {string} [sessionId='default'] - ID da sessão do carrinho
+   * @returns {Promise<Object>} Resposta da API
+   */
+  async checkout({ payment_method, customer_id, notes }, sessionId = 'default') {
+    try {
+      const response = await apiService.request(
+        `${CART_BASE_URL}/checkout`,
+        {
+          method: 'POST',
+          body: {
+            payment_method,
+            customer_id,
+            notes
+          },
+          headers: {
+            'X-Session-ID': sessionId
+          }
+        }
+      );
+      return response;
+    } catch (error) {
+      console.error('Erro ao finalizar compra:', error);
+      throw new Error(error.message || 'Erro ao finalizar compra');
     }
   },
 
@@ -158,7 +184,7 @@ const cartService = {
    * @returns {boolean} Verdadeiro se o item estiver no carrinho
    */
   isInCart(items, productId) {
-    return items.some(item => (item.product_id || item.id) === productId);
+    return items.some(item => item.product_id === productId);
   },
 
   /**
@@ -168,7 +194,7 @@ const cartService = {
    * @returns {number} Quantidade do item no carrinho
    */
   getItemQuantity(items, productId) {
-    const item = items.find(item => (item.product_id || item.id) === productId);
+    const item = items.find(item => item.product_id === productId);
     return item ? item.quantity : 0;
   }
 };

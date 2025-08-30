@@ -11,7 +11,7 @@ import Funcionarios from './pages/Funcionarios';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import TodasVendas from './pages/TodasVendas';
-import PDVPage from './pages/PDVPage';
+import PDV2 from './pages/PDV2';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -50,82 +50,24 @@ const AppContent = () => {
           <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />
         } 
       />
-      <Route
-        path="/dashboard"
+      
+      {/* Rotas protegidas */}
+      <Route 
+        path="/" 
         element={
           <ProtectedRoute>
-            <Layout>
-              <Dashboard />
-            </Layout>
+            <Layout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/produtos"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Produtos />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/funcionarios"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Funcionarios />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/relatorios"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Relatorios />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/vendas"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <TodasVendas />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/pdv"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <PDVPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/configuracoes"
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Configuracoes />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="*"
-        element={
-          <Navigate to="/dashboard" replace />
-        }
-      />
+      >
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="produtos" element={<Produtos />} />
+        <Route path="funcionarios" element={<Funcionarios />} />
+        <Route path="vendas" element={<TodasVendas />} />
+        <Route path="relatorios" element={<Relatorios />} />
+        <Route path="configuracoes" element={<Configuracoes />} />
+        <Route path="pdv" element={<PDV2 />} />
+      </Route>
     </Routes>
   );
 };
