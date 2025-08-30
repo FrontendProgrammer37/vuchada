@@ -45,7 +45,7 @@ const PDV = () => {
 
   // Add item to cart with inventory control
   const addToCart = (product) => {
-    if (product.is_weight_based) {
+    if (product.venda_por_peso) {
       const maxWeight = product.track_inventory ? product.current_stock : null;
       setWeightInput({
         isOpen: true,

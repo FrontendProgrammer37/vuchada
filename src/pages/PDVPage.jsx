@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, X, Check, ShoppingCart } from 'lucide-react';
+import { Plus, Minus, X, Check, ShoppingCart, Scale } from 'lucide-react';
 import apiService from '../services/api';
+import cartService from '../services/cartService';
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
@@ -12,6 +13,14 @@ const formatCurrency = (value) => {
   }).format(value);
 };
 
+// Função para formatar peso
+const formatWeight = (weight) => {
+  return new Intl.NumberFormat('pt-MZ', {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3
+  }).format(weight);
+};
+
 const PDVPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,44 +28,141 @@ const PDVPage = () => {
   const [cart, setCart] = useState([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [showCart, setShowCart] = useState(!isMobile);
+  const [weightInput, setWeightInput] = useState({
+    isOpen: false,
+    product: null,
+    initialWeight: '0.100',
+    isEditing: false,
+    cartItemId: null
+  });
+  const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
+  const [amountReceived, setAmountReceived] = useState('');
 
-  // Buscar produtos da API
+  // Load initial data
   useEffect(() => {
-    const fetchProducts = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        // Busca todos os produtos sem paginação para o PDV
-        const productsData = await apiService.getProducts({ limit: 1000 });
-        setProducts(productsData);
+        const [productsData, cartData] = await Promise.all([
+          apiService.getProducts({ limit: 1000 }),
+          cartService.getCart()
+        ]);
+        
+        const mappedProducts = productsData.map(product => ({
+          ...product,
+          is_weight_based: product.venda_por_peso || false,
+          current_stock: product.estoque,
+          sale_price: product.preco_venda,
+          price: product.preco_compra
+        }));
+        
+        setProducts(mappedProducts);
+        setCart(cartData.items || []);
       } catch (err) {
-        console.error('Erro ao buscar produtos:', err);
-        setError('Erro ao carregar produtos. Tente novamente mais tarde.');
+        setError('Erro ao carregar dados');
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchProducts();
+    
+    loadData();
   }, []);
 
   // Adicionar item ao carrinho
-  const addToCart = (product) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.id === product.id);
-      if (existingItem) {
-        return prevCart.map(item =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
+  const addToCart = async (product) => {
+    try {
+      if (product.is_weight_based) {
+        const maxWeight = product.track_inventory ? product.current_stock : null;
+        setWeightInput({
+          isOpen: true,
+          product: { ...product, maxWeight },
+          initialWeight: '0.100',
+          isEditing: false
+        });
+        return;
       }
-      return [...prevCart, { 
-        ...product, 
-        quantity: 1,
-        price: product.sale_price // Usar preço de venda do produto
-      }];
-    });
+      await cartService.addItem(product, 1, false);
+      const updatedCart = await cartService.getCart();
+      setCart(updatedCart.items);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Erro ao adicionar ao carrinho');
+    }
   };
+
+  // Handle weight confirmation
+  const handleWeightConfirm = async (weight) => {
+    try {
+      const { product, isEditing, cartItemId } = weightInput;
+      
+      if (isEditing) {
+        await cartService.updateItemQuantity(cartItemId, weight);
+      } else {
+        await cartService.addItem(product, weight, true);
+      }
+      
+      const updatedCart = await cartService.getCart();
+      setCart(updatedCart.items);
+      setWeightInput({ isOpen: false, product: null, isEditing: false, cartItemId: null });
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Erro ao processar item por peso');
+    }
+  };
+
+  // Atualizar quantidade
+  const updateQuantity = async (itemId, newQuantity, isWeightBased = false) => {
+    try {
+      if (newQuantity <= 0) {
+        await removeFromCart(itemId);
+        return;
+      }
+      await cartService.updateItemQuantity(itemId, isWeightBased ? parseFloat(newQuantity) : Math.floor(newQuantity));
+      const updatedCart = await cartService.getCart();
+      setCart(updatedCart.items);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Erro ao atualizar quantidade');
+    }
+  };
+
+  // Remover item do carrinho
+  const removeFromCart = async (itemId) => {
+    try {
+      await cartService.removeItem(itemId);
+      const updatedCart = await cartService.getCart();
+      setCart(updatedCart.items);
+      setError(null);
+    } catch (err) {
+      setError('Erro ao remover item do carrinho');
+    }
+  };
+
+  // Finalizar venda
+  const handleCheckout = async () => {
+    if (cart.length === 0) {
+      alert('Adicione itens ao carrinho antes de finalizar a venda');
+      return;
+    }
+
+    try {
+      await cartService.checkout(paymentMethod, amountReceived || cartTotal);
+      await cartService.clearCart();
+      setCart([]);
+      setAmountReceived('');
+      setError(null);
+      alert('Venda finalizada com sucesso!');
+    } catch (err) {
+      setError(err.message || 'Erro ao processar venda');
+      console.error(err);
+    }
+  };
+
+  // Calcular total do carrinho
+  const cartTotal = cart.reduce((total, item) => total + (item.unit_price * item.quantity), 0);
+  const totalItems = cart.reduce((sum, item) => sum + (item.is_weight_based ? 1 : item.quantity), 0);
+  const change = amountReceived ? (parseFloat(amountReceived) - cartTotal).toFixed(2) : 0;
 
   // Renderizar produto na lista
   const renderProduct = (product) => (
@@ -64,13 +170,35 @@ const PDVPage = () => {
       <h3 className="font-bold text-gray-800">{product.name}</h3>
       <p className="text-gray-600 text-sm mb-2">{product.description || 'Sem descrição'}</p>
       <div className="flex justify-between items-center mt-2">
-        <span className="font-bold text-blue-600">{formatCurrency(product.sale_price)}</span>
+        <div>
+          <span className="font-bold text-blue-600">{formatCurrency(product.sale_price)}</span>
+          {product.venda_por_peso && (
+            <span className="ml-1 text-xs text-gray-500">por kg</span>
+          )}
+          <div className="text-sm text-gray-500">
+            {product.venda_por_peso 
+              ? formatWeight(product.estoque) + ' kg' 
+              : product.estoque}
+          </div>
+        </div>
         <button
           onClick={() => addToCart(product)}
-          className="bg-blue-600 text-white p-1 rounded hover:bg-blue-700 transition-colors"
-          aria-label="Adicionar ao carrinho"
+          className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white ${
+            (product.estoque > 0 || product.venda_por_peso)
+              ? (product.venda_por_peso ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700')
+              : 'bg-gray-400 cursor-not-allowed'
+          }`}
+          disabled={!product.venda_por_peso && product.estoque <= 0}
+          title={product.venda_por_peso ? 'Adicionar por peso' : 'Adicionar ao carrinho'}
         >
-          <Plus size={16} />
+          {product.venda_por_peso ? (
+            <>
+              <Scale className="h-3 w-3 mr-1" />
+              Pesar
+            </>
+          ) : (
+            product.estoque > 0 ? 'Adicionar' : 'Sem Estoque'
+          )}
         </button>
       </div>
     </div>
@@ -82,7 +210,7 @@ const PDVPage = () => {
       <div className="flex-1">
         <div className="font-medium text-gray-800">{item.name}</div>
         <div className="text-sm text-gray-500">
-          {formatCurrency(item.price)} × {item.quantity}
+          {formatCurrency(item.unit_price)} × {item.quantity}
         </div>
       </div>
       <div className="flex items-center space-x-1">
@@ -117,40 +245,6 @@ const PDVPage = () => {
       </div>
     </div>
   );
-
-  // Calcular total do carrinho
-  const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Função para finalizar a venda
-  const handleCheckout = async () => {
-    if (cart.length === 0) {
-      alert('Adicione itens ao carrinho antes de finalizar a venda');
-      return;
-    }
-
-    try {
-      const result = await apiService.request('cart/checkout', {
-        method: 'POST',
-        body: JSON.stringify({
-          items: cart.map(item => ({
-            product_id: item.id,
-            quantity: item.quantity,
-            unit_price: item.sale_price,
-            subtotal: item.sale_price * item.quantity
-          })),
-          total: cartTotal,
-          // Adicione outros campos necessários aqui, como dados do cliente, pagamento, etc.
-        })
-      });
-      alert(`Venda finalizada com sucesso! Número da venda: ${result.sale_number}`);
-      setCart([]);
-      setShowCart(false);
-    } catch (error) {
-      console.error('Erro ao finalizar venda:', error);
-      alert('Erro ao finalizar venda. Verifique o console para mais detalhes.');
-    }
-  };
 
   // Limpar carrinho
   const clearCart = () => {
@@ -274,6 +368,35 @@ const PDVPage = () => {
                         <span className="text-gray-600">Total:</span>
                         <span className="text-lg font-bold text-gray-900">
                           {formatCurrency(cartTotal)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-gray-600">Método de pagamento:</span>
+                        <select
+                          value={paymentMethod}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                        >
+                          <option value="DINHEIRO">Dinheiro</option>
+                          <option value="CARTÃO">Cartão</option>
+                        </select>
+                      </div>
+                      
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-gray-600">Valor recebido:</span>
+                        <input
+                          type="number"
+                          value={amountReceived}
+                          onChange={(e) => setAmountReceived(e.target.value)}
+                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-gray-600">Troco:</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {formatCurrency(change)}
                         </span>
                       </div>
                       

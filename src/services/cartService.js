@@ -3,16 +3,64 @@ import apiService from './api';
 const CART_ENDPOINT = '/api/v1/cart';
 
 const cartService = {
-  // Adicionar item ao carrinho
-  async addItem(productId, quantity = 1) {
+  // Generate a unique ID for cart items
+  generateItemId(product, isWeightBased = false, weight = null) {
+    if (isWeightBased && weight !== null) {
+      return `weight_${product.id}_${Date.now()}`;
+    }
+    return `product_${product.id}`;
+  },
+
+  // Check if an item already exists in the cart
+  findExistingItem(items, product, isWeightBased = false) {
+    if (isWeightBased) {
+      // For weight-based items, always treat as unique
+      return null;
+    }
+    return items.find(item => 
+      item.id === `product_${product.id}` && 
+      !item.is_weight_based
+    );
+  },
+
+  // Add item to cart with duplicate prevention
+  async addItem(product, quantity = 1, isWeightBased = false) {
     try {
+      // Get current cart
+      const currentCart = await this.getCart();
+      const existingItem = this.findExistingItem(currentCart.items, product, isWeightBased);
+
+      if (existingItem && !isWeightBased) {
+        // Update quantity for existing non-weight-based item
+        return this.updateItemQuantity(existingItem.id, existingItem.quantity + quantity);
+      }
+
+      // Create new item
+      const itemId = this.generateItemId(product, isWeightBased, quantity);
+      const newItem = {
+        id: itemId,
+        product_id: product.id,
+        name: product.name,
+        quantity: isWeightBased ? parseFloat(quantity) : Math.floor(quantity),
+        unit_price: product.sale_price,
+        is_weight_based: isWeightBased,
+        product: {
+          id: product.id,
+          name: product.name,
+          sku: product.sku,
+          sale_price: product.sale_price,
+          current_stock: product.current_stock,
+          track_inventory: product.track_inventory,
+          is_weight_based: product.is_weight_based
+        }
+      };
+
+      // Add to cart
       const response = await apiService.request(`${CART_ENDPOINT}/add`, {
         method: 'POST',
-        body: {
-          product_id: productId,
-          quantity: quantity
-        }
+        body: newItem
       });
+
       return response;
     } catch (error) {
       console.error('Erro ao adicionar item ao carrinho:', error);
@@ -20,28 +68,13 @@ const cartService = {
     }
   },
 
-  // Obter carrinho atual
-  async getCart() {
-    try {
-      const response = await apiService.request(CART_ENDPOINT);
-      return response;
-    } catch (error) {
-      // Se o carrinho não existir, retorna um carrinho vazio
-      if (error.response?.status === 404) {
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
-      }
-      console.error('Erro ao buscar carrinho:', error);
-      throw error;
-    }
-  },
-
-  // Atualizar quantidade de um item
-  async updateItemQuantity(productId, quantity) {
+  // Update existing methods to work with the new ID system
+  async updateItemQuantity(itemId, quantity) {
     try {
       const response = await apiService.request(`${CART_ENDPOINT}/update`, {
         method: 'PUT',
         body: {
-          product_id: productId,
+          item_id: itemId,
           quantity: quantity
         }
       });
@@ -52,64 +85,73 @@ const cartService = {
     }
   },
 
-  // Remover item do carrinho
-  async removeItem(productId) {
+  // Keep existing methods but ensure they work with the new ID system
+  async removeItem(itemId) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
+      await apiService.request(`${CART_ENDPOINT}/remove`, {
         method: 'DELETE',
-        body: { product_id: productId }
+        body: { item_id: itemId }
       });
-      return response;
+      return true;
     } catch (error) {
-      console.error('Erro ao remover item:', error);
+      console.error('Erro ao remover item do carrinho:', error);
       throw error;
     }
   },
 
-  // Limpar carrinho
+  // Existing methods remain the same
+  async getCart() {
+    try {
+      const response = await apiService.request(CART_ENDPOINT);
+      return response;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      }
+      console.error('Erro ao buscar carrinho:', error);
+      throw error;
+    }
+  },
+
   async clearCart() {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/clear`, {
-        method: 'DELETE'
-      });
-      return response;
+      await apiService.request(CART_ENDPOINT, { method: 'DELETE' });
+      return true;
     } catch (error) {
       console.error('Erro ao limpar carrinho:', error);
       throw error;
     }
   },
 
-  // Verificar se um item está no carrinho
-  isInCart(items, productId) {
-    return items.some(item => item.product_id === productId);
+  // Helper methods
+  isInCart(items, productId, isWeightBased = false) {
+    if (isWeightBased) return false; // Weight-based items are always unique
+    return items.some(item => 
+      item.product_id === productId && 
+      !item.is_weight_based
+    );
   },
 
-  // Obter quantidade de um item no carrinho
-  getItemQuantity(items, productId) {
-    const item = items.find(item => item.product_id === productId);
+  getItemQuantity(items, productId, isWeightBased = false) {
+    const item = items.find(item => 
+      item.product_id === productId && 
+      item.is_weight_based === isWeightBased
+    );
     return item ? item.quantity : 0;
   },
 
-  // Finalizar compra/checkout
-  async checkout() {
+  async checkout(paymentMethod, amountReceived) {
     try {
-      const response = await apiService.request('cart/checkout', {
+      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
         method: 'POST',
         body: {
-          payment_method: 'dinheiro', // You might want to make this dynamic based on user selection
-          items: (await this.getCart()).items.map(item => ({
-            product_id: item.id,
-            quantity: item.quantity
-          }))
+          payment_method: paymentMethod,
+          amount_received: parseFloat(amountReceived || 0)
         }
       });
-      
-      // Clear cart after successful checkout
-      await this.clearCart();
-      
       return response;
     } catch (error) {
-      console.error('Erro ao finalizar venda:', error);
+      console.error('Erro ao finalizar compra:', error);
       throw error;
     }
   }
