@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CART_ENDPOINT = '/api/v1/cart';
+const CART_ENDPOINT = '/cart';
 
 // Opções de pagamento disponíveis
 export const PAYMENT_METHODS = {
@@ -38,7 +38,10 @@ const cartService = {
   // Obter carrinho atual
   async getCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}?session_id=${sessionId}`);
+      const response = await apiService.request(CART_ENDPOINT, {
+        method: 'GET',
+        params: { session_id: sessionId }
+      });
       return response;
     } catch (error) {
       // Se o carrinho não existir, retorna um carrinho vazio
@@ -53,12 +56,13 @@ const cartService = {
   // Atualizar quantidade de um item
   async updateItemQuantity(productId, quantity, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/update?session_id=${sessionId}`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/update`, {
         method: 'PUT',
         body: {
           product_id: productId,
           quantity: quantity
-        }
+        },
+        params: { session_id: sessionId }
       });
       return response;
     } catch (error) {
@@ -70,9 +74,10 @@ const cartService = {
   // Remover item do carrinho
   async removeItem(productId, sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/remove?session_id=${sessionId}`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/remove`, {
         method: 'DELETE',
-        body: { product_id: productId }
+        body: { product_id: productId },
+        params: { session_id: sessionId }
       });
       return response;
     } catch (error) {
@@ -84,8 +89,9 @@ const cartService = {
   // Limpar carrinho
   async clearCart(sessionId = 'default') {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/clear?session_id=${sessionId}`, {
-        method: 'DELETE'
+      const response = await apiService.request(`${CART_ENDPOINT}/clear`, {
+        method: 'DELETE',
+        params: { session_id: sessionId }
       });
       return response;
     } catch (error) {
@@ -118,14 +124,15 @@ const cartService = {
       }
 
       const response = await apiService.request(
-        `${CART_ENDPOINT}/checkout?session_id=${sessionId}`,
+        `${CART_ENDPOINT}/checkout`,
         {
           method: 'POST',
           body: {
             payment_method: paymentMethod,
             customer_id: customerId,
             notes: notes
-          }
+          },
+          params: { session_id: sessionId }
         }
       );
 

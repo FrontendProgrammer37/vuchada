@@ -36,7 +36,23 @@ class ApiService {
     async request(endpoint, options = {}) {
         // Remove a barra inicial se existir para evitar duplicação
         const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        const url = `${this.baseURL}/${normalizedEndpoint}`;
+        let url = `${this.baseURL}/${normalizedEndpoint}`;
+        
+        // Handle query parameters
+        if (options.params) {
+            const params = new URLSearchParams();
+            Object.entries(options.params).forEach(([key, value]) => {
+                if (value !== null && value !== undefined) {
+                    params.append(key, value);
+                }
+            });
+            const queryString = params.toString();
+            if (queryString) {
+                url += (url.includes('?') ? '&' : '?') + queryString;
+            }
+            // Remove params from options to avoid sending them in the body
+            delete options.params;
+        }
         
         const config = {
             method: 'GET',
