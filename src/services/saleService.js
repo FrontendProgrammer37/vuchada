@@ -10,7 +10,7 @@ const saleService = {
    * @param {string} [params.end_date] Data de fim (YYYY-MM-DD)
    * @param {string} [params.payment_method] Método de pagamento
    * @param {string} [params.status] Status da venda
-   * @returns {Promise<Array>} Lista de vendas
+   * @returns {Promise<{data: Array, total: number}>} Lista de vendas e total de itens
    */
   async listSales({
     skip = 0,
@@ -20,9 +20,10 @@ const saleService = {
     payment_method,
     status
   } = {}) {
-    const params = new URLSearchParams();
-    params.append('skip', skip);
-    params.append('limit', limit);
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString()
+    });
     
     if (start_date) params.append('start_date', start_date);
     if (end_date) params.append('end_date', end_date);
@@ -30,11 +31,20 @@ const saleService = {
     if (status) params.append('status', status);
 
     try {
-      const response = await apiService.request(`sales/?${params.toString()}`);
-      return response;
+      const response = await apiService.request(`sales?${params.toString()}`);
+      // Garante que sempre retornamos um objeto com data e total
+      if (Array.isArray(response)) {
+        return { data: response, total: response.length };
+      }
+      // Se a API retornar um objeto com paginação
+      return {
+        data: response.data || [],
+        total: response.total || response.data?.length || 0
+      };
     } catch (error) {
       console.error('Erro ao listar vendas:', error);
-      throw error;
+      // Retorna um objeto vazio em caso de erro
+      return { data: [], total: 0 };
     }
   },
 

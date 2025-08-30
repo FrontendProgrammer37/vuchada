@@ -46,43 +46,42 @@ class ApiService {
             credentials: 'include', // Inclui credenciais se necessário
         };
 
+        // Se o body for um objeto, converte para JSON
+        if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
+            config.body = JSON.stringify(config.body);
+        }
+
         try {
             const response = await fetch(url, config);
             
+            // Clona a resposta para permitir múltiplas leituras
+            const responseClone = response.clone();
+            
+            // Se a resposta não for bem-sucedida, tenta extrair a mensagem de erro
             if (!response.ok) {
                 let errorMessage = 'Erro na requisição';
                 try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.detail || JSON.stringify(errorData);
+                    const errorData = await responseClone.json();
+                    errorMessage = errorData.detail || errorData.message || errorMessage;
                 } catch (e) {
-                    errorMessage = await response.text();
+                    // Se não conseguir extrair JSON, usa o status text
+                    errorMessage = response.statusText || errorMessage;
                 }
                 
                 const error = new Error(errorMessage);
                 error.status = response.status;
-                error.response = response;
                 throw error;
             }
-
-            // Se a resposta for 204 (No Content), retorna null
-            if (response.status === 204) {
-                return null;
-            }
-
-            // Tenta fazer o parse da resposta como JSON
+            
+            // Tenta fazer parse do JSON
             try {
                 return await response.json();
             } catch (e) {
-                console.warn('Resposta não é um JSON válido:', e);
-                return await response.text();
+                // Se não for JSON, retorna o texto da resposta
+                return response.text();
             }
         } catch (error) {
-            console.error('Erro na requisição:', {
-                url,
-                error: error.message,
-                status: error.status,
-                response: error.response ? await error.response.text() : null
-            });
+            console.error(`Erro na requisição para ${url}:`, error);
             throw error;
         }
     }

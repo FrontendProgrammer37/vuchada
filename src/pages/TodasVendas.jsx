@@ -88,17 +88,15 @@ const TodasVendas = () => {
         }
       });
 
-      const resposta = await saleService.listSales(params);
+      const { data: vendas, total } = await saleService.listSales(params);
       
       // Atualizar estado com as vendas
-      setVendas(resposta);
+      setVendas(vendas);
       
       // Atualizar total de itens para paginação
-      // Nota: A API precisa retornar o total de itens para paginação correta
-      // Se não retornar, podemos usar o tamanho do array como referência
       setPaginacao(prev => ({
         ...prev,
-        total: resposta.length // Isso será ajustado quando a API retornar o total correto
+        total
       }));
       
     } catch (err) {
