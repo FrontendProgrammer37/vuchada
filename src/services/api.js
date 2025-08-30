@@ -404,7 +404,7 @@ class ApiService {
 
     // ===== VENDAS =====
     
-    async getSales({ skip = 0, limit = 10 } = {}) {
+    async getSales({ skip = 0, limit = 100 } = {}) {
         const params = new URLSearchParams();
         if (skip) params.append('skip', skip);
         if (limit) params.append('limit', limit);
@@ -412,19 +412,7 @@ class ApiService {
         const queryString = params.toString();
         const endpoint = `sales/${queryString ? `?${queryString}` : ''}`;
         
-        const sales = await this.request(endpoint);
-        
-        // Format the response to include product details
-        return sales.map(sale => ({
-            ...sale,
-            items: sale.items ? sale.items.map(item => ({
-                ...item,
-                product: {
-                    id: item.product_id,
-                    name: item.product?.nome || 'Produto não encontrado'
-                }
-            })) : []
-        }));
+        return this.request(endpoint);
     }
 
     async getSale(id) {
@@ -432,11 +420,9 @@ class ApiService {
     }
 
     async createSale(saleData) {
-        // Remover referência ao cliente se existir
-        const { customer_id, ...saleDataSemCliente } = saleData;
         return this.request('sales/', {
             method: 'POST',
-            body: JSON.stringify(saleDataSemCliente),
+            body: JSON.stringify(saleData),
         });
     }
 
@@ -450,6 +436,17 @@ class ApiService {
     async deleteSale(id) {
         return this.request(`sales/${id}`, {
             method: 'DELETE',
+        });
+    }
+
+    async printReceipt(saleId) {
+        return this.request(`sales/${saleId}/receipt`, {
+            method: 'GET',
+            headers: {
+                ...this.getHeaders(),
+                'Accept': 'application/pdf',
+            },
+            responseType: 'blob', // Para lidar com a resposta binária do PDF
         });
     }
 

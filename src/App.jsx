@@ -11,7 +11,7 @@ import Funcionarios from './pages/Funcionarios';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import TodasVendas from './pages/TodasVendas';
-import PDVPage from './pages/PDVPage';
+import PDV from './pages/PDV';
 
 // Componente para proteger rotas
 const ProtectedRoute = ({ children }) => {
@@ -105,7 +105,17 @@ const AppContent = () => {
         element={
           <ProtectedRoute>
             <Layout>
-              <PDVPage />
+              <PDV />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pdv"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <PDV />
             </Layout>
           </ProtectedRoute>
         }
