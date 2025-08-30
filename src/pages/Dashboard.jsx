@@ -11,6 +11,7 @@ import {
   Archive,
   TrendingUp as Profit
 } from 'lucide-react';
+import { getSales } from '../services/salesService';
 import apiService from '../services/api';
 
 const Dashboard = () => {
@@ -39,11 +40,12 @@ const Dashboard = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [sales, products] = await Promise.all([
-        apiService.getSales(),
+      const [salesResponse, products] = await Promise.all([
+        getSales({ limit: 1000 }), // Fetch more sales to get accurate statistics
         apiService.getProducts()
       ]);
 
+      const sales = salesResponse.items || [];
       const now = new Date();
       const todayKey = now.toISOString().slice(0, 10);
       const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -114,7 +116,8 @@ const Dashboard = () => {
       setRecentSales(recent);
       setError(null);
     } catch (err) {
-      setError(err.message || 'Erro ao carregar métricas');
+      console.error('Erro ao carregar métricas:', err);
+      setError(err.message || 'Erro ao carregar métricas do dashboard');
     } finally {
       setLoading(false);
     }
