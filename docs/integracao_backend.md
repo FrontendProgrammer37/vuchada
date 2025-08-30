@@ -245,3 +245,157 @@ Este documento descreve os requisitos e especificações para a integração do 
 3. Implementar cache para melhor desempenho
 4. Adicionar logs detalhados
 5. Configurar monitoramento e alertas
+
+## Fluxo de Venda
+
+### 1. Adicionar Itens ao Carrinho
+
+#### POST /api/v1/cart/add
+- **Headers**:
+  ```json
+  {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer SEU_TOKEN_JWT"
+  }
+  ```
+- **Request Body**:
+  ```json
+  {
+    "product_id": 13,
+    "quantity": 1
+  }
+  ```
+- **Exemplo em JavaScript**:
+  ```javascript
+  async function adicionarAoCarrinho(produtoId, quantidade) {
+    const response = await fetch('http://seu-backend.com/api/v1/cart/add', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      },
+      body: JSON.stringify({
+        product_id: produtoId,
+        quantity: quantidade
+      })
+    });
+    return await response.json();
+  }
+  ```
+
+### 2. Visualizar Carrinho (Opcional)
+
+#### GET /api/v1/cart?session_id=default
+- **Headers**:
+  ```json
+  {
+    "Authorization": "Bearer SEU_TOKEN_JWT"
+  }
+  ```
+- **Exemplo em JavaScript**:
+  ```javascript
+  async function visualizarCarrinho() {
+    const response = await fetch('http://seu-backend.com/api/v1/cart?session_id=default', {
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }
+    });
+    return await response.json();
+  }
+  ```
+
+### 3. Finalizar Venda (Checkout)
+
+#### POST /api/v1/cart/checkout?session_id=default
+- **Headers**:
+  ```json
+  {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer SEU_TOKEN_JWT"
+  }
+  ```
+- **Request Body**:
+  ```json
+  {
+    "payment_method": "DINHEIRO",
+    "customer_id": null,
+    "notes": "Observações da venda (opcional)"
+  }
+  ```
+- **Métodos de Pagamento Válidos**:
+  - DINHEIRO
+  - MPESA
+  - EMOLA
+  - CARTAO_POS
+  - TRANSFERENCIA
+  - MILLENNIUM
+  - BCI
+  - STANDARD_BANK
+  - ABSA_BANK
+  - LETSHEGO
+  - MYBUCKS
+
+- **Exemplo em JavaScript**:
+  ```javascript
+  async function finalizarVenda(metodoPagamento, clienteId = null, observacoes = '') {
+    const response = await fetch('http://seu-backend.com/api/v1/cart/checkout?session_id=default', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      },
+      body: JSON.stringify({
+        payment_method: metodoPagamento,
+        customer_id: clienteId,
+        notes: observacoes
+      })
+    });
+    return await response.json();
+  }
+  ```
+
+### 4. Tratamento de Erros
+
+```javascript
+try {
+  const resultado = await finalizarVenda('DINHEIRO');
+  if (!response.ok) {
+    throw new Error('Erro ao finalizar venda');
+  }
+  console.log('Venda realizada com sucesso:', resultado);
+} catch (erro) {
+  console.error('Erro:', erro);
+  // Mostrar mensagem de erro para o usuário
+}
+```
+
+### 5. Exemplo Completo de Fluxo de Venda
+
+```javascript
+async function realizarVenda(produtoId, quantidade, metodoPagamento) {
+  try {
+    // 1. Adicionar ao carrinho
+    await adicionarAoCarrinho(produtoId, quantidade);
+    
+    // 2. Finalizar venda
+    const resultado = await finalizarVenda(metodoPagamento);
+    
+    // 3. Sucesso
+    alert('Venda realizada com sucesso! Nº: ' + resultado.sale_number);
+    return resultado;
+    
+  } catch (erro) {
+    console.error('Erro na venda:', erro);
+    alert('Erro ao processar a venda: ' + erro.message);
+    throw erro;
+  }
+}
+```
+
+### Boas Práticas
+
+1. **Validação**: Sempre valide os dados antes de enviar para a API.
+2. **Feedback**: Mostre mensagens claras de sucesso/erro para o usuário.
+3. **Loading**: Adicione indicadores de carregamento durante as requisições.
+4. **Sessão**: Mantenha o `session_id` consistente durante toda a sessão do usuário.
+5. **Segurança**: Nunca exponha tokens JWT no frontend.
