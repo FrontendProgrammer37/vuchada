@@ -66,10 +66,20 @@ const salesService = {
   async getSales(params = {}) {
     try {
       const response = await api.get('/sales', { params });
-      return response.data;
+      // Ensure the response has the expected structure
+      if (response && response.data) {
+        return {
+          items: Array.isArray(response.data) ? response.data : [],
+          page: params.page || 1,
+          total_items: response.data?.length || 0,
+          total_pages: Math.ceil((response.data?.length || 0) / (params.limit || 10))
+        };
+      }
+      return { items: [], page: 1, total_items: 0, total_pages: 1 };
     } catch (error) {
       console.error('Erro ao buscar vendas:', error);
-      throw error;
+      // Return empty result on error to prevent UI breakage
+      return { items: [], page: 1, total_items: 0, total_pages: 1 };
     }
   },
 

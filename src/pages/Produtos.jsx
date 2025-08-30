@@ -116,6 +116,7 @@ const Produtos = () => {
     // Salvar produto
     const saveProduct = async () => {
         try {
+            setError(null);
             const productData = {
                 name: formData.name,
                 description: formData.description || null,
@@ -130,14 +131,23 @@ const Produtos = () => {
 
             if (editingProduct) {
                 await apiService.updateProduct(editingProduct.id, productData);
+                toast.success('Produto atualizado com sucesso!');
             } else {
                 await apiService.createProduct(productData);
+                toast.success('Produto criado com sucesso!');
             }
 
             closeModal();
-            loadData(); // Recarregar dados
+            loadData();
         } catch (err) {
-            setError('Erro ao salvar produto: ' + (err.message || 'Erro desconhecido'));
+            console.error('Erro ao salvar produto:', err);
+            const errorMessage = err.message.includes('Já existe um produto')
+                ? err.message
+                : 'Erro ao salvar produto. Verifique os dados e tente novamente.';
+            
+            setError(errorMessage);
+            // Scroll to top to show the error message
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 

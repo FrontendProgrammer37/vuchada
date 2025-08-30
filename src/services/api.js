@@ -236,6 +236,27 @@ class ApiService {
             throw new Error('A categoria é obrigatória');
         }
 
+        // Check if product with this SKU already exists
+        try {
+            const existingProducts = await this.getProducts({ search: productData.sku });
+            const existingProduct = existingProducts.find(p => p.sku === productData.sku);
+            
+            if (existingProduct) {
+                // If found and active, throw error
+                if (existingProduct.is_active !== false) {
+                    throw new Error('Já existe um produto ativo com este código SKU');
+                }
+                // If found but inactive, update it instead
+                return this.updateProduct(existingProduct.id, {
+                    ...productData,
+                    is_active: true // Reactivate the product
+                });
+            }
+        } catch (error) {
+            console.warn('Erro ao verificar produto existente:', error);
+            // Continue with creation if check fails
+        }
+
         // Convert frontend format to backend format
         const formattedData = {
             codigo: productData.sku.toString().trim(),
@@ -261,6 +282,10 @@ class ApiService {
             return response;
         } catch (error) {
             console.error('Erro ao criar produto:', error);
+            // Improve error message for duplicate SKU
+            if (error.message.includes('Já existe um produto com este código')) {
+                throw new Error('Já existe um produto com este código SKU. Por favor, use um código único.');
+            }
             throw new Error(`Falha ao criar produto: ${error.message}`);
         }
     }
@@ -459,36 +484,8 @@ class ApiService {
     }
 
     // ===== VENDAS =====
-    
-    async getSales() {
-        return this.request('sales/');
-    }
-
-    async getSale(id) {
-        return this.request(`sales/${id}`);
-    }
-
-    async createSale(saleData) {
-        // Remover referência ao cliente se existir
-        const { customer_id, ...saleDataSemCliente } = saleData;
-        return this.request('sales/', {
-            method: 'POST',
-            body: JSON.stringify(saleDataSemCliente),
-        });
-    }
-
-    async updateSale(id, saleData) {
-        return this.request(`sales/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(saleData),
-        });
-    }
-
-    async deleteSale(id) {
-        return this.request(`sales/${id}`, {
-            method: 'DELETE',
-        });
-    }
+    // Note: Vendas-related methods are now in salesService.js
+    // to better organize the code and avoid duplication
 
     // ===== INVENTÁRIO =====
     
