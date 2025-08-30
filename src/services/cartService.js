@@ -67,10 +67,13 @@ const cartService = {
   },
 
   // Limpar carrinho
-  async clearCart() {
+  async clearCart(sessionId) {
     try {
       const response = await apiService.request('cart', {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'X-Session-ID': sessionId
+        }
       });
       return response;
     } catch (error) {

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Plus, Minus, X, Check, ShoppingCart } from 'lucide-react';
 import apiService from '../services/api';
 import cartService from '../services/cartService'; // Import the cartService
+import { CartContext } from '../contexts/CartContext';
 
 // Função para formatar valores em Metical (MZN)
 const formatCurrency = (value) => {
@@ -20,6 +21,7 @@ const PDVPage = () => {
   const [cart, setCart] = useState([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [showCart, setShowCart] = useState(!isMobile);
+  const { updateCartCount } = useContext(CartContext);
 
   // Buscar produtos da API
   useEffect(() => {
@@ -160,9 +162,32 @@ const PDVPage = () => {
   };
 
   // Limpar carrinho
-  const clearCart = () => {
-    if (window.confirm('Tem certeza que deseja limpar o carrinho?')) {
+  const clearCart = async () => {
+    if (!window.confirm('Tem certeza que deseja limpar o carrinho?')) {
+      return;
+    }
+    
+    try {
+      // Obtém o sessionId do localStorage ou gera um novo se não existir
+      let sessionId = localStorage.getItem('sessionId');
+      if (!sessionId) {
+        sessionId = 'sess_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('sessionId', sessionId);
+      }
+      
+      // Limpa o carrinho no backend
+      await cartService.clearCart(sessionId);
+      
+      // Limpa o carrinho local
       setCart([]);
+      
+      // Atualiza o contexto do carrinho se estiver usando
+      if (updateCartCount) {
+        updateCartCount(0);
+      }
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      alert('Não foi possível limpar o carrinho. Tente novamente.');
     }
   };
 
