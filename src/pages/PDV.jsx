@@ -116,6 +116,7 @@ const PDV = () => {
       return;
     }
 
+    // Validação do pagamento em dinheiro
     if (paymentMethod === 'DINHEIRO' && (!amountReceived || parseFloat(amountReceived) < cart.total)) {
       setError('O valor recebido deve ser maior ou igual ao total da venda');
       return;
@@ -125,14 +126,38 @@ const PDV = () => {
     setError(null);
 
     try {
-      const result = await cartService.checkout(paymentMethod, amountReceived);
-      // Handle successful sale
+      // Dados para o checkout
+      const checkoutData = {
+        paymentMethod,
+        amountReceived: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : 0,
+        customerId: null, // Você pode adicionar um seletor de cliente posteriormente
+        discount: 0, // Você pode adicionar um campo de desconto se necessário
+        notes: '' // Você pode adicionar um campo de observações se necessário
+      };
+
+      // Chamar o serviço de checkout com todos os dados necessários
+      const result = await cartService.checkout(checkoutData);
+      
+      // Limpar carrinho e estado após venda bem-sucedida
       setCart({ items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 });
       setAmountReceived('');
-      alert('Venda realizada com sucesso!');
+      
+      // Mostrar mensagem de sucesso com detalhes da venda
+      alert(`Venda #${result.sale_number} realizada com sucesso!\nTotal: ${formatCurrency(result.total_amount)}`);
+      
     } catch (err) {
-      setError(err.message || 'Erro ao processar venda');
       console.error('Erro ao processar venda:', err);
+      
+      // Tratamento de erros específicos
+      if (err.status === 422) {
+        setError('Dados inválidos: ' + (err.detail || 'Verifique os dados informados'));
+      } else if (err.status === 400) {
+        setError('Erro na requisição: ' + (err.message || 'Dados inválidos'));
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Ocorreu um erro ao processar a venda. Tente novamente.');
+      }
     } finally {
       setProcessing(false);
     }

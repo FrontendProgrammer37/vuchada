@@ -267,19 +267,61 @@ class CartService {
   }
 
   // Checkout
-  async checkout(paymentMethod, amountReceived) {
+  async checkout(paymentData) {
+    const { 
+      paymentMethod, 
+      amountReceived = 0, 
+      customerId = null, 
+      discount = 0,
+      notes = ''
+    } = paymentData;
+
+    // Validação básica
+    if (!paymentMethod) {
+      throw new Error('Método de pagamento é obrigatório');
+    }
+
+    if (paymentMethod === 'DINHEIRO' && !amountReceived) {
+      throw new Error('Valor recebido é obrigatório para pagamento em dinheiro');
+    }
+
     const checkoutData = {
       payment_method: paymentMethod,
+      customer_id: customerId,
+      discount: parseFloat(discount) || 0,
+      notes: notes,
+      change_for: 0 // Será calculado no backend
     };
     
-    if (paymentMethod === 'DINHEIRO') {
+    // Adiciona amount_received apenas para pagamento em dinheiro
+    if (paymentMethod === 'DINHEIRO' && amountReceived) {
       checkoutData.amount_received = parseFloat(amountReceived);
     }
 
-    return this.makeRequest(`${CART_ENDPOINT}/checkout`, {
-      method: 'POST',
-      body: checkoutData
-    });
+    try {
+      const response = await this.makeRequest(`${CART_ENDPOINT}/checkout`, {
+        method: 'POST',
+        body: checkoutData
+      });
+
+      // Limpa o carrinho após checkout bem-sucedido
+      await this.clearCart();
+      
+      return response;
+    } catch (error) {
+      console.error('Erro ao finalizar compra:', error);
+      
+      // Tratamento de erros específicos
+      if (error.status === 400) {
+        throw new Error('Dados inválidos para finalizar a compra');
+      } else if (error.status === 422) {
+        throw new Error('Erro de validação: ' + (error.detail || 'Verifique os dados informados'));
+      } else if (error.status === 404) {
+        throw new Error('Carrinho não encontrado');
+      } else {
+        throw new Error('Erro ao processar o pagamento. Tente novamente.');
+      }
+    }
   }
 
   normalizeCart(cart) {
