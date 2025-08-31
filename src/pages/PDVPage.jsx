@@ -204,6 +204,7 @@ const PDVPage = () => {
   });
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
   const [amountReceived, setAmountReceived] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -302,21 +303,51 @@ const PDVPage = () => {
 
   // Finalizar venda
   const handleCheckout = async () => {
-    if (cart.length === 0) {
-      alert('Adicione itens ao carrinho antes de finalizar a venda');
-      return;
+    if (cart.length === 0) return;
+    
+    // For cash payments, ensure amount received is sufficient
+    if (paymentMethod === 'DINHEIRO') {
+      const received = parseFloat(amountReceived);
+      if (isNaN(received) || received < cartTotal) {
+        alert('Por favor, insira um valor recebido válido');
+        return;
+      }
     }
 
     try {
-      await cartService.checkout(paymentMethod, amountReceived || cartTotal);
-      await cartService.clearCart();
+      setIsLoading(true);
+      
+      // Prepare the order data
+      const orderData = {
+        items: cart.map(item => ({
+          product_id: item.product_id || item.id,
+          quantity: item.quantity,
+          unit_price: item.unit_price || item.price,
+          weight: item.weight || null,
+          subtotal: (item.unit_price || item.price) * item.quantity
+        })),
+        payment_method: paymentMethod,
+        amount_received: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cartTotal,
+        total: cartTotal,
+        change: paymentMethod === 'DINHEIRO' ? (parseFloat(amountReceived) - cartTotal).toFixed(2) : 0
+      };
+
+      // Call the cart service to process the checkout
+      await cartService.checkout(orderData.payment_method, orderData.amount_received);
+      
+      // Clear the cart and reset form
       setCart([]);
+      setPaymentMethod('DINHEIRO');
       setAmountReceived('');
-      setError(null);
-      alert('Venda finalizada com sucesso!');
-    } catch (err) {
-      setError(err.message || 'Erro ao processar venda');
-      console.error(err);
+      
+      // Show success message
+      alert('Venda realizada com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao finalizar venda:', error);
+      alert(error.message || 'Ocorreu um erro ao processar a venda. Por favor, tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -491,91 +522,110 @@ const PDVPage = () => {
                     {/* Payment Section */}
                     <div className={`border-t border-gray-200 p-4 bg-white ${cart.length > 2 ? 'overflow-y-auto flex-1' : ''}`}>
                       {/* Payment form */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Forma de Pagamento
-                        </label>
-                        <select
-                          value={paymentMethod}
-                          onChange={(e) => setPaymentMethod(e.target.value)}
-                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-white"
-                        >
-                          {PAYMENT_METHODS.map((method) => (
-                            <option key={method.value} value={method.value}>
-                              {method.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Amount Received (only for cash) */}
-                      {paymentMethod === 'DINHEIRO' && (
-                        <div className="mb-4">
+                      <div className="space-y-4">
+                        <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Valor Recebido
+                            Forma de Pagamento
                           </label>
-                          <input
-                            type="number"
-                            value={amountReceived}
-                            onChange={(e) => setAmountReceived(e.target.value)}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                            placeholder="0.00"
-                            min="0"
-                            step="0.01"
-                          />
-                          {parseFloat(amountReceived || 0) < cartTotal && (
-                            <p className="mt-1 text-sm text-red-600">
-                              Valor insuficiente
-                            </p>
-                          )}
+                          <select
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                          >
+                            {PAYMENT_METHODS.map((method) => (
+                              <option key={method.value} value={method.value}>
+                                {method.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      )}
 
-                      {/* Order Summary */}
-                      <div className="border-t border-gray-200 pt-3 mt-4">
-                        <div className="flex justify-between py-1">
-                          <span className="text-sm text-gray-600">Subtotal:</span>
-                          <span className="text-sm font-medium">{formatCurrency(cartTotal)}</span>
-                        </div>
-                        
-                        {paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) > 0 && (
-                          <div className="flex justify-between py-1">
-                            <span className="text-sm text-gray-600">Troco:</span>
-                            <span className="text-sm font-bold text-green-600">
-                              {formatCurrency(parseFloat(amountReceived) - cartTotal)}
-                            </span>
+                        {/* Amount Received (only for cash) */}
+                        {paymentMethod === 'DINHEIRO' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Valor Recebido
+                            </label>
+                            <div className="relative rounded-md shadow-sm">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span className="text-gray-500 sm:text-sm">MT</span>
+                              </div>
+                              <input
+                                type="number"
+                                value={amountReceived}
+                                onChange={(e) => setAmountReceived(e.target.value)}
+                                className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-12 pr-12 sm:text-sm border-gray-300 rounded-md p-2 border"
+                                placeholder="0.00"
+                                min="0"
+                                step="0.01"
+                              />
+                            </div>
+                            {parseFloat(amountReceived || 0) < cartTotal && (
+                              <p className="mt-1 text-sm text-red-600">
+                                Valor insuficiente. Faltam {formatCurrency(cartTotal - parseFloat(amountReceived || 0))}
+                              </p>
+                            )}
                           </div>
                         )}
 
-                        <div className="flex justify-between py-1 font-medium text-base mt-2">
-                          <span>Total:</span>
-                          <span>{formatCurrency(cartTotal)}</span>
-                        </div>
-                      </div>
+                        {/* Order Summary */}
+                        <div className="border-t border-gray-200 pt-3 mt-2">
+                          <div className="flex justify-between py-1">
+                            <span className="text-sm text-gray-600">Subtotal:</span>
+                            <span className="text-sm font-medium">{formatCurrency(cartTotal)}</span>
+                          </div>
+                          
+                          {paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) > 0 && (
+                            <div className="flex justify-between py-1">
+                              <span className="text-sm text-gray-600">Troco:</span>
+                              <span className="text-sm font-bold text-green-600">
+                                {formatCurrency(parseFloat(amountReceived) - cartTotal)}
+                              </span>
+                            </div>
+                          )}
 
-                      {/* Checkout Button */}
-                      <button
-                        onClick={handleCheckout}
-                        disabled={
-                          cart.length === 0 || 
-                          (paymentMethod === 'DINHEIRO' && 
-                           (isNaN(parseFloat(amountReceived)) || 
-                            parseFloat(amountReceived || 0) < cartTotal))
-                        }
-                        className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white mt-4 ${
-                          cart.length === 0 || 
-                          (paymentMethod === 'DINHEIRO' && 
-                           (isNaN(parseFloat(amountReceived)) || 
-                            parseFloat(amountReceived || 0) < cartTotal))
-                            ? 'bg-gray-400 cursor-not-allowed'
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
-                      >
-                        <div className="flex items-center justify-center">
-                          <Check className="mr-2" size={20} />
-                          Finalizar Venda
+                          <div className="flex justify-between py-1 font-medium text-base mt-2">
+                            <span>Total:</span>
+                            <span>{formatCurrency(cartTotal)}</span>
+                          </div>
                         </div>
-                      </button>
+
+                        {/* Checkout Button */}
+                        <button
+                          onClick={handleCheckout}
+                          disabled={
+                            isLoading ||
+                            cart.length === 0 || 
+                            (paymentMethod === 'DINHEIRO' && 
+                             (isNaN(parseFloat(amountReceived)) || 
+                              parseFloat(amountReceived || 0) < cartTotal))
+                          }
+                          className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white mt-4 ${
+                            isLoading ||
+                            cart.length === 0 || 
+                            (paymentMethod === 'DINHEIRO' && 
+                             (isNaN(parseFloat(amountReceived)) || 
+                              parseFloat(amountReceived || 0) < cartTotal))
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-green-600 hover:bg-green-700'
+                          }`}
+                        >
+                          {isLoading ? (
+                            <div className="flex items-center justify-center">
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Processando...
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center">
+                              <Check className="mr-2" size={20} />
+                              Finalizar Venda
+                            </div>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}
