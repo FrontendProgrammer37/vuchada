@@ -6,7 +6,16 @@ const CART_ENDPOINT = 'cart';
 // Maximum number of retries for failed requests
 const MAX_RETRIES = 2;
 
+// Generate a unique session ID
+const generateSessionId = () => {
+  const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem('sessionId', sessionId);
+  return sessionId;
+};
+
 const cartService = {
+  sessionId: localStorage.getItem('sessionId') || generateSessionId(),
+
   // Generate a unique ID for cart items
   generateItemId(product, isWeightBased = false, weight = null) {
     if (isWeightBased && weight !== null) {
@@ -22,32 +31,35 @@ const cartService = {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          'X-Session-ID': this.sessionId,
           ...(options.headers || {})
         },
         body: options.body ? JSON.stringify(options.body) : undefined
       });
       return response;
     } catch (error) {
-      // If unauthorized and we have retries left, try to refresh token and retry
+      // Handle 422 validation errors
+      if (error.status === 422) {
+        console.error('Validation error:', error.response);
+        throw new Error('Dados inválidos. Verifique os campos e tente novamente.');
+      }
+
+      // Handle 404 for cart
+      if (error.status === 404 && endpoint === CART_ENDPOINT) {
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      }
+
+      // Handle 401 Unauthorized
       if (error.status === 401 && retryCount < MAX_RETRIES) {
         try {
-          // Try to refresh the token
           await apiService.refreshToken();
-          // Retry the request with the new token
           return this.makeRequest(endpoint, options, retryCount + 1);
         } catch (refreshError) {
           console.error('Failed to refresh token:', refreshError);
           throw new Error('Sessão expirada. Por favor, faça login novamente.');
         }
       }
-      
-      // Handle specific error cases
-      if (error.status === 404 && endpoint === CART_ENDPOINT) {
-        // Cart not found, return empty cart
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
-      }
-      
-      // Re-throw the error if we can't handle it
+
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
     }
