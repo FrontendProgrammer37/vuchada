@@ -335,22 +335,44 @@ class CartService {
     }
   }
 
+  // Normalize cart data to ensure consistent structure
   normalizeCart(cart) {
-    cart.items = cart.items.map(item => ({
-      ...item,
-      price: parseFloat(item.price || 0),
-      subtotal: parseFloat(item.subtotal || 0),
-      unit_price: parseFloat(item.unit_price || item.price || 0),
-      quantity: parseFloat(item.quantity || 0)
-    }));
+    if (!cart) {
+      return {
+        items: [],
+        subtotal: 0,
+        tax_amount: 0,
+        total: 0,
+        itemCount: 0,
+        total_quantity: 0
+      };
+    }
+
+    // Ensure items is an array
+    const items = Array.isArray(cart.items) ? cart.items : [];
     
-    cart.subtotal = parseFloat(cart.subtotal || 0);
-    cart.tax_amount = parseFloat(cart.tax_amount || 0);
-    cart.total = parseFloat(cart.total || 0);
-    cart.itemCount = cart.items.length;
-    cart.total_quantity = cart.items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+    // Calculate item count and total quantity
+    const itemCount = items.length;
+    const total_quantity = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
     
-    return cart;
+    // Ensure numeric values
+    const subtotal = parseFloat(cart.subtotal) || 0;
+    const tax_amount = parseFloat(cart.tax_amount) || 0;
+    const total = parseFloat(cart.total) || 0;
+
+    return {
+      items: items.map(item => ({
+        ...item,
+        price: parseFloat(item.price) || 0,
+        quantity: parseFloat(item.quantity) || 0,
+        subtotal: parseFloat(item.subtotal) || 0
+      })),
+      subtotal,
+      tax_amount,
+      total,
+      itemCount,
+      total_quantity
+    };
   }
 }
 
