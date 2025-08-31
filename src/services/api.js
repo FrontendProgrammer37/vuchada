@@ -51,57 +51,48 @@ class ApiService {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
-            mode: 'cors',
-            credentials: 'include',
-            cache: 'no-cache',
-            redirect: 'follow',
-            referrerPolicy: 'no-referrer',
+            mode: 'cors', // Força o modo CORS
+            credentials: 'include', // Inclui credenciais se necessário
         };
-
-        // Ensure headers are properly set for JSON requests
-        if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
-            config.body = JSON.stringify(config.body);
-            config.headers['Content-Type'] = 'application/json';
-        }
 
         try {
             const response = await fetch(url, config);
+            const responseClone = response.clone(); // Clone the response for potential error handling
             
-            // Handle 204 No Content responses
+            if (!response.ok) {
+                let errorMessage = 'Erro na requisição';
+                try {
+                    const errorData = await responseClone.json();
+                    errorMessage = errorData.detail || JSON.stringify(errorData);
+                } catch (e) {
+                    errorMessage = await responseClone.text();
+                }
+                
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.response = response;
+                throw error;
+            }
+
+            // Se a resposta for 204 (No Content), retorna null
             if (response.status === 204) {
                 return null;
             }
-            
-            // Parse JSON response
-            const data = await response.json().catch(() => ({}));
-            
-            // Handle error responses
-            if (!response.ok) {
-                const error = new Error(data.detail || response.statusText || 'Request failed');
-                error.status = response.status;
-                error.response = response;
-                error.data = data;
-                throw error;
+
+            // Tenta fazer o parse da resposta como JSON
+            try {
+                return await response.json();
+            } catch (e) {
+                console.warn('Resposta não é um JSON válido:', e);
+                return await response.text();
             }
-            
-            return data;
-            
         } catch (error) {
-            console.error('API Request Error:', {
+            console.error('Erro na requisição:', {
                 url,
                 error: error.message,
                 status: error.status,
-                response: error.response,
-                data: error.data
+                response: error.response ? await error.response.text().catch(() => 'Não foi possível ler o corpo da resposta') : null
             });
-            
-            // Handle CORS errors specifically
-            if (error.message === 'Failed to fetch') {
-                const corsError = new Error('Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.');
-                corsError.isCorsError = true;
-                throw corsError;
-            }
-            
             throw error;
         }
     }
@@ -521,6 +512,105 @@ class ApiService {
     async printReceipt(saleId) {
         return this.request(`sales/${saleId}/print`, {
             method: 'POST',
+        });
+    }
+
+    // Cart Operations
+    
+    /**
+     * Get cart contents
+     * @returns {Promise<Array>} Array of cart items
+     */
+    async getCart() {
+        return this.request('cart', {
+            method: 'GET',
+            headers: {
+                'X-Session-ID': this.sessionId,
+                'Accept': 'application/json'
+            }
+        });
+    }
+
+    /**
+     * Add item to cart
+     * @param {Object} item - Cart item to add
+     * @param {number} item.product_id - Product ID
+     * @param {number} item.quantity - Quantity
+     * @param {boolean} [item.is_weight_sale=false] - If it's a weight-based sale
+     * @param {number} [item.weight_in_kg] - Weight in kg (required if is_weight_sale is true)
+     * @param {number} [item.custom_price] - Custom price (optional)
+     * @returns {Promise<Object>} Added cart item
+     */
+    async addToCart(item) {
+        return this.request('cart/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-ID': this.sessionId,
+                'Accept': 'application/json'
+            },
+            body: {
+                product_id: item.product_id,
+                quantity: item.quantity,
+                is_weight_sale: item.is_weight_sale || false,
+                ...(item.weight_in_kg && { weight_in_kg: item.weight_in_kg }),
+                ...(item.custom_price && { custom_price: item.custom_price })
+            }
+        });
+    }
+
+    /**
+     * Remove item from cart
+     * @param {number} productId - Product ID to remove
+     * @returns {Promise<Object>} Operation result
+     */
+    async removeFromCart(productId) {
+        return this.request(`cart/items/${productId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-Session-ID': this.sessionId,
+                'Accept': 'application/json'
+            }
+        });
+    }
+
+    /**
+     * Clear the entire cart
+     * @returns {Promise<Object>} Operation result
+     */
+    async clearCart() {
+        return this.request('cart', {
+            method: 'DELETE',
+            headers: {
+                'X-Session-ID': this.sessionId,
+                'Accept': 'application/json'
+            }
+        });
+    }
+
+    /**
+     * Process checkout
+     * @param {Object} checkoutData - Checkout data
+     * @param {string} checkoutData.payment_method - Payment method
+     * @param {number} [checkoutData.amount_received] - Amount received (for cash payments)
+     * @param {number} [checkoutData.customer_id] - Customer ID (optional)
+     * @param {string} [checkoutData.notes] - Order notes (optional)
+     * @returns {Promise<Object>} Checkout result
+     */
+    async checkout(checkoutData) {
+        return this.request('cart/checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Session-ID': this.sessionId,
+                'Accept': 'application/json'
+            },
+            body: {
+                payment_method: checkoutData.payment_method,
+                customer_id: checkoutData.customer_id || null,
+                notes: checkoutData.notes || null,
+                ...(checkoutData.amount_received && { amount_received: checkoutData.amount_received })
+            }
         });
     }
 

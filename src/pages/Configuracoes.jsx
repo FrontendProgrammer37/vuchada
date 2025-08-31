@@ -15,10 +15,14 @@ import {
   Download,
   User as UserIcon,
   Menu,
-  X as CloseIcon
+  X as CloseIcon,
+  AlertCircle,
+  AlertOctagon,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import UserProfile from '../components/UserProfile';
+import adminService from '../services/adminService';
 
 const Configuracoes = () => {
   const { user } = useAuth();
@@ -48,11 +52,19 @@ const Configuracoes = () => {
 
   const [backup, setBackup] = useState({
     ultimoBackup: '2024-01-15 14:30',
-    proximoBackup: '2024-01-16 14:30',
-    tamanhoBackup: '2.5 GB',
-    localizacao: '/backups/',
-    retencao: '30 dias'
+    proximoBackup: '2024-01-16 02:00',
+    frequencia: 'diário',
+    local: 'Servidor Local',
+    tamanho: '2.4 GB',
+    status: 'concluído',
+    notificacoes: true,
+    emailNotificacao: 'admin@empresa.com',
+    manterBackups: 30
   });
+
+  // Estado para o modal de confirmação
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetStatus, setResetStatus] = useState({ loading: false, error: null, success: false });
 
   useEffect(() => {
     // Simular carregamento de dados
@@ -81,10 +93,41 @@ const Configuracoes = () => {
     { id: 'empresa', name: 'Empresa', icon: <Building2 size={18} /> },
     { id: 'sistema', name: 'Sistema', icon: <Settings size={18} /> },
     { id: 'backup', name: 'Backup', icon: <Database size={18} /> },
-    { id: 'usuarios', name: 'Usuários', icon: <Users size={18} /> },
-    { id: 'notificacoes', name: 'Notificações', icon: <Bell size={18} /> },
     { id: 'seguranca', name: 'Segurança', icon: <Shield size={18} /> },
+    { id: 'notificacoes', name: 'Notificações', icon: <Bell size={18} /> },
+    { id: 'manutencao', name: 'Manutenção', icon: <AlertOctagon size={18} className="text-red-500" />, isAdmin: true }
   ];
+
+  // Função para resetar o banco de dados
+  const handleResetDatabase = async () => {
+    if (!window.confirm('ATENÇÃO: Esta operação irá APAGAR TODOS OS DADOS do banco de dados e restaurar para o estado inicial. Deseja continuar?')) {
+      return;
+    }
+
+    setResetStatus({ loading: true, error: null, success: false });
+    
+    try {
+      const response = await adminService.resetDatabase();
+      setResetStatus({ loading: false, error: null, success: true });
+      alert('Banco de dados resetado com sucesso! O sistema será recarregado.');
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro ao resetar o banco de dados:', error);
+      setResetStatus({ 
+        loading: false, 
+        error: error.message || 'Erro ao resetar o banco de dados', 
+        success: false 
+      });
+    }
+  };
+
+  // Filtrar abas com base nas permissões do usuário
+  const filteredTabs = tabs.filter(tab => {
+    if (tab.isAdmin) {
+      return user?.is_superuser || user?.role === 'admin';
+    }
+    return true;
+  });
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -308,56 +351,74 @@ const Configuracoes = () => {
           </div>
         );
       
-      case 'usuarios':
+      case 'manutencao':
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Usuários</h2>
-            
-            {/* Conteúdo da aba de usuários */}
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                  <div className="sm:col-span-4">
-                    <label htmlFor="nome-usuario" className="block text-sm font-medium text-gray-700">
-                      Nome do Usuário
-                    </label>
-                    <input
-                      type="text"
-                      id="nome-usuario"
-                      name="nome-usuario"
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                  </div>
-                  
-                  {/* Outros campos do formulário... */}
-                </div>
-              </div>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold text-gray-800">Manutenção do Sistema</h2>
             </div>
-          </div>
-        );
-      
-      case 'notificacoes':
-        return (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Notificações</h2>
             
-            {/* Conteúdo da aba de notificações */}
             <div className="bg-white shadow overflow-hidden sm:rounded-lg">
               <div className="px-4 py-5 sm:p-6">
-                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                  <div className="sm:col-span-4">
-                    <label htmlFor="notificacoes-email" className="block text-sm font-medium text-gray-700">
-                      Notificações por Email
-                    </label>
-                    <input
-                      type="email"
-                      id="notificacoes-email"
-                      name="notificacoes-email"
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
+                <div className="rounded-md bg-red-50 p-4 mb-6">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">Atenção: Operação Crítica</h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>
+                          Esta seção contém operações que podem afetar significativamente o sistema. 
+                          Use com extrema cautela.
+                        </p>
+                      </div>
+                    </div>
                   </div>
+                </div>
+
+                <div className="border border-red-200 rounded-lg p-4 bg-red-50">
+                  <h3 className="text-lg font-medium text-red-800 mb-2">Resetar Banco de Dados</h3>
+                  <p className="text-sm text-red-700 mb-4">
+                    Esta operação irá APAGAR TODOS OS DADOS do sistema e restaurar para o estado inicial. 
+                    Isso inclui produtos, vendas, usuários e configurações. Apenas o usuário administrador 
+                    padrão será recriado.
+                  </p>
                   
-                  {/* Outros campos do formulário... */}
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={handleResetDatabase}
+                      disabled={resetStatus.loading}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {resetStatus.loading ? (
+                        <>
+                          <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <AlertOctagon className="-ml-1 mr-2 h-4 w-4" />
+                          Resetar Banco de Dados
+                        </>
+                      )}
+                    </button>
+                    
+                    {resetStatus.error && (
+                      <p className="mt-2 text-sm text-red-600">
+                        <AlertCircle className="inline h-4 w-4 mr-1" />
+                        {resetStatus.error}
+                      </p>
+                    )}
+                    
+                    {resetStatus.success && (
+                      <p className="mt-2 text-sm text-green-600">
+                        <Check className="inline h-4 w-4 mr-1" />
+                        Banco de dados resetado com sucesso!
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -427,7 +488,7 @@ const Configuracoes = () => {
             <aside className="hidden md:block w-64 flex-shrink-0">
               <nav>
                 <ul className="space-y-1">
-                  {tabs.map((tab) => (
+                  {filteredTabs.map((tab) => (
                     <li key={tab.id}>
                       <button
                         onClick={() => setActiveTab(tab.id)}
@@ -435,7 +496,7 @@ const Configuracoes = () => {
                           activeTab === tab.id
                             ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent'
-                        }`}
+                        } ${tab.id === 'manutencao' ? 'text-red-600 hover:text-red-700' : ''}`}
                       >
                         <span className="mr-3">{tab.icon}</span>
                         {tab.name}
@@ -478,7 +539,7 @@ const Configuracoes = () => {
               >
                 <nav>
                   <ul className="space-y-1 p-2">
-                    {tabs.map((tab) => (
+                    {filteredTabs.map((tab) => (
                       <li key={tab.id}>
                         <button
                           onClick={() => {
@@ -489,7 +550,7 @@ const Configuracoes = () => {
                             activeTab === tab.id
                               ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-500'
                               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                          }`}
+                          } ${tab.id === 'manutencao' ? 'text-red-600 hover:text-red-700' : ''}`}
                           aria-current={activeTab === tab.id ? 'page' : undefined}
                         >
                           <span className="mr-3">{tab.icon}</span>

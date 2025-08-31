@@ -215,19 +215,12 @@ const PDV = () => {
             product_id: item.id,
             quantity: item.quantity,
             is_weight_sale: item.is_weight_based || false,
-            weight_in_kg: item.is_weight_based ? item.quantity : undefined,
+            ...(item.is_weight_based && { weight_in_kg: item.quantity }),
             custom_price: item.sale_price
           };
           
           console.log('Adding item to cart:', cartItem);
-          await apiService.request('cart/add', {
-            method: 'POST',
-            body: cartItem,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-          });
+          await apiService.addToCart(cartItem);
         }
         return true;
       } catch (error) {
@@ -251,31 +244,17 @@ const PDV = () => {
 
       // Verify cart contents
       console.log('Verifying cart contents...');
-      const cartContents = await apiService.request('cart', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
+      const cartContents = await apiService.getCart();
       console.log('Cart contents:', cartContents);
 
       // Process checkout
       const checkoutData = {
         payment_method: paymentMethod,
-        customer_id: null,
-        notes: null,
-        amount_received: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cartTotal
+        ...(paymentMethod === 'DINHEIRO' && { amount_received: parseFloat(amountReceived) })
       };
 
       console.log('Processing checkout with:', checkoutData);
-      const result = await apiService.request('cart/checkout', {
-        method: 'POST',
-        body: checkoutData,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+      const result = await apiService.checkout(checkoutData);
       
       console.log('Checkout successful:', result);
       
