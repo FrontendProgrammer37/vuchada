@@ -30,28 +30,37 @@ class CartService {
       ADD_ITEM: `${CART_ENDPOINT}/add`,
       REMOVE_ITEM: (productId) => `${CART_ENDPOINT}/items/${productId}`,
       CLEAR_CART: `${CART_ENDPOINT}/clear`,
-      CHECKOUT: `${CART_ENDPOINT}/checkout`
+      CHECKOUT: `${CART_ENDPOINT}/checkout`,
+      GET_CART: `${CART_ENDPOINT}`
     };
   }
 
   // Create a new cart
   async createCart() {
     try {
-      // The cart will be created when the first item is added
-      // Just mark as initialized and return an empty cart structure
+      console.log('Creating new cart...');
+      // Tenta adicionar um item vazio para forçar a criação do carrinho
+      await this.makeRequest(
+        this.ENDPOINTS.ADD_ITEM,
+        {
+          method: 'POST',
+          body: {
+            product_id: 0, // ID inválido, mas forçará a criação do carrinho
+            quantity: 0
+          }
+        }
+      );
+      
+      // Depois de criar, busca o carrinho vazio
+      const cart = await this.makeRequest(this.ENDPOINTS.GET_CART);
       this.isInitialized = true;
-      return { 
-        items: [], 
-        subtotal: 0, 
-        tax_amount: 0, 
-        total: 0, 
-        itemCount: 0,
-        total_quantity: 0 
-      };
+      return this.normalizeCart(cart);
+      
     } catch (error) {
       console.error('Failed to create cart:', error);
-      this.isInitialized = true; // Still mark as initialized to prevent infinite loops
-      throw error;
+      // Se der erro, retorna um carrinho vazio localmente
+      this.isInitialized = true;
+      return this.getEmptyCart();
     }
   }
 
@@ -142,22 +151,17 @@ class CartService {
   // Get current cart
   async getCart() {
     try {
-      const response = await this.makeRequest(this.ENDPOINTS.CART);
-      
-      if (response) {
-        return this.normalizeCart(response);
-      }
-      
-      // If no response, return empty cart
-      return this.getEmptyCart();
-      
+      console.log('Fetching cart...');
+      const cart = await this.makeRequest(this.ENDPOINTS.GET_CART);
+      return this.normalizeCart(cart);
     } catch (error) {
+      console.log('Error getting cart, creating new one...', error);
+      // Se o carrinho não existir (404), cria um novo
       if (error.status === 404) {
-        // Return empty cart structure if cart doesn't exist
-        return this.getEmptyCart();
+        return this.createCart();
       }
-      console.error('Error getting cart:', error);
-      throw error;
+      // Se for outro erro, retorna um carrinho vazio
+      return this.getEmptyCart();
     }
   }
   
@@ -371,34 +375,33 @@ class CartService {
   // Normalize cart data to ensure consistent structure
   normalizeCart(cart) {
     if (!cart) {
-      return {
-        items: [],
-        subtotal: 0,
-        tax_amount: 0,
-        total: 0,
-        itemCount: 0,
-        total_quantity: 0
-      };
+      return this.getEmptyCart();
     }
 
-    // Ensure items is an array
-    const items = Array.isArray(cart.items) ? cart.items : [];
-    
-    // Calculate item count and total quantity
+    // Se já estiver no formato normalizado, retorna como está
+    if (cart.itemCount !== undefined && cart.total_quantity !== undefined) {
+      return cart;
+    }
+
+    // Calcula totais se não existirem
+    const items = cart.items || [];
+    const subtotal = cart.subtotal || items.reduce((sum, item) => sum + (item.total_price || 0), 0);
+    const tax_amount = cart.tax_amount || 0;
+    const total = cart.total || (subtotal + tax_amount);
     const itemCount = items.length;
-    const total_quantity = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
-    
-    // Ensure numeric values
-    const subtotal = parseFloat(cart.subtotal) || 0;
-    const tax_amount = parseFloat(cart.tax_amount) || 0;
-    const total = parseFloat(cart.total) || 0;
+    const total_quantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
     return {
       items: items.map(item => ({
-        ...item,
-        price: parseFloat(item.price) || 0,
-        quantity: parseFloat(item.quantity) || 0,
-        subtotal: parseFloat(item.subtotal) || 0
+        id: item.id || item.product_id,
+        product_id: item.product_id,
+        name: item.name || item.product_name || '',
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || item.price || 0,
+        total_price: item.total_price || (item.quantity || 0) * (item.unit_price || 0),
+        is_weight_sale: item.is_weight_sale || false,
+        weight_in_kg: item.weight_in_kg || null,
+        custom_price: item.custom_price || null
       })),
       subtotal,
       tax_amount,
