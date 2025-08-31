@@ -21,7 +21,7 @@ const PAYMENT_METHODS = [
 const PDV = () => {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState({ items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 });
   const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
   const [amountReceived, setAmountReceived] = useState('');
   const [loading, setLoading] = useState(true);
@@ -33,34 +33,43 @@ const PDV = () => {
     cartItemId: null
   });
   const [processing, setProcessing] = useState(false);
+  const [showCart, setShowCart] = useState(false);
 
-  // Load products
+  // Load products and cart on component mount
   useEffect(() => {
-    const fetchProducts = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getProducts({ limit: 1000 }); // Get all products
-        setProducts(data);
+        // Load products
+        const productsData = await apiService.getProducts({ limit: 1000 });
+        setProducts(productsData);
+        
+        // Load cart
+        await loadCart();
       } catch (err) {
-        setError('Erro ao carregar produtos');
+        setError('Erro ao carregar dados');
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    loadData();
   }, []);
 
-  // Filter products based on search term
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Load cart from API
+  const loadCart = async () => {
+    try {
+      const cartData = await cartService.getCart();
+      setCart(cartData);
+    } catch (err) {
+      console.error('Erro ao carregar carrinho:', err);
+      setError('Erro ao carregar carrinho');
+    }
+  };
 
   // Add item to cart with inventory control
-  const addToCart = (product) => {
+  const addToCart = async (product) => {
     if (product.venda_por_peso) {
       const maxWeight = product.track_inventory ? product.current_stock : null;
       setWeightInput({
@@ -72,233 +81,39 @@ const PDV = () => {
       return;
     }
 
-    // Regular product with inventory control
-    if (product.track_inventory && product.current_stock <= 0) {
-      setError(`Produto ${product.name} sem estoque disponível`);
-      return;
+    try {
+      await cartService.addItem(product, 1, false);
+      await loadCart();
+      setShowCart(true);
+    } catch (err) {
+      setError(err.message || 'Erro ao adicionar item ao carrinho');
     }
-
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => 
-        item.id === product.id && !item.is_weight_based
-      );
-      
-      if (existingItem) {
-        const newQuantity = existingItem.quantity + 1;
-        if (product.track_inventory && newQuantity > product.current_stock) {
-          setError(`Quantidade solicitada excede o estoque disponível de ${product.current_stock} unidades`);
-          return prevCart;
-        }
-        return prevCart.map(item =>
-          item.id === product.id && !item.is_weight_based
-            ? { ...item, quantity: newQuantity }
-            : item
-        );
-      }
-      
-      if (product.track_inventory && product.current_stock < 1) {
-        setError(`Produto ${product.name} sem estoque disponível`);
-        return prevCart;
-      }
-      
-      return [...prevCart, { ...product, quantity: 1, is_weight_based: false }];
-    });
   };
-
-  // Update quantity with inventory control
-  const updateQuantity = (productId, newQuantity, isWeightBased = false) => {
-    if (newQuantity <= 0) {
-      removeFromCart(productId);
-      return;
-    }
-
-    setCart(prevCart => {
-      const item = prevCart.find(item => item.id === productId);
-      if (!item) return prevCart;
-
-      // Skip inventory check for weight-based items (handled in modal)
-      if (!isWeightBased && item.track_inventory && newQuantity > item.current_stock) {
-        setError(`Quantidade solicitada excede o estoque disponível de ${item.current_stock} unidades`);
-        return prevCart;
-      }
-
-      return prevCart.map(item =>
-        item.id === productId ? { ...item, quantity: newQuantity } : item
-      );
-    });
-  };
-
-  // Handle weight confirmation from modal
-  const handleWeightConfirm = (weight) => {
-    const { product, isEditing, cartItemId } = weightInput;
-    
-    if (isEditing) {
-      updateQuantity(cartItemId, weight, true);
-    } else {
-      // For new weight-based items, check inventory if tracking is enabled
-      if (product.track_inventory && weight > product.current_stock) {
-        setError(`Peso solicitado (${formatWeight(weight)} kg) excede o estoque disponível (${formatWeight(product.current_stock)} kg)`);
-        return;
-      }
-      
-      setCart(prevCart => [
-        ...prevCart,
-        {
-          ...product,
-          id: `${product.id}-${Date.now()}`,
-          quantity: weight,
-          is_weight_based: true,
-          // Update current_stock to reflect the remaining inventory
-          current_stock: product.track_inventory 
-            ? product.current_stock - weight 
-            : product.current_stock
-        }
-      ]);
-    }
-    
-    setWeightInput({ isOpen: false, product: null, isEditing: false, cartItemId: null });
-  };
-
-  // Open weight editor
-  const openWeightEditor = (item) => {
-    setWeightInput({
-      isOpen: true,
-      product: item,
-      isEditing: true,
-      cartItemId: item.id,
-      initialWeight: item.quantity.toString()
-    });
-  };
-
-  // Format weight for display
-  const formatWeight = (weight) => {
-    const value = parseFloat(weight);
-    return isNaN(value) ? '0.000 kg' : `${value.toFixed(3).replace(/\.?0+$/, '')} kg`;
-  };
-
-  // Remove item from cart
-  const removeFromCart = (productId) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== productId));
-  };
-
-  // Calculate cart total
-  const cartTotal = cart.reduce(
-    (total, item) => total + (item.sale_price * item.quantity),
-    0
-  );
-
-  // Calculate change
-  const change = Math.max(0, parseFloat(amountReceived || 0) - cartTotal);
 
   // Process sale
   const processSale = async () => {
-    if (cart.length === 0) return;
-    
-    // Validate payment for cash payments
-    if (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal) {
-      setError('Valor recebido é menor que o total da compra');
+    if (cart.items.length === 0) {
+      setError('Adicione itens ao carrinho antes de finalizar a venda');
       return;
     }
-    
+
+    if (paymentMethod === 'DINHEIRO' && (!amountReceived || parseFloat(amountReceived) < cart.total)) {
+      setError('O valor recebido deve ser maior ou igual ao total da venda');
+      return;
+    }
+
     setProcessing(true);
-    setError('Processando venda...');
-
-    const addItemsToCart = async (clearFirst = false) => {
-      try {
-        if (clearFirst) {
-          console.log('Clearing cart before adding items...');
-          await cartService.clearCart();
-        }
-
-        // Add all items to cart
-        for (const item of cart) {
-          console.log('Adding item to cart:', {
-            product: item.id,
-            quantity: item.quantity,
-            isWeightBased: item.is_weight_based,
-            customPrice: item.sale_price
-          });
-          
-          await cartService.addItem(
-            { id: item.id },
-            item.quantity,
-            item.is_weight_based,
-            item.sale_price
-          );
-        }
-        return true;
-      } catch (error) {
-        console.error('Error adding items to cart:', {
-          error: error.message,
-          status: error.status,
-          response: error.response
-        });
-        throw error;
-      }
-    };
+    setError(null);
 
     try {
-      // First try without clearing
-      try {
-        await addItemsToCart(false);
-      } catch (firstError) {
-        console.log('First attempt failed, retrying with cart clear');
-        await addItemsToCart(true);
-      }
-
-      // Verify cart contents
-      console.log('Verifying cart contents...');
-      const cartContents = await cartService.getCart();
-      console.log('Cart contents:', cartContents);
-
-      // Process checkout
-      const checkoutData = {
-        payment_method: paymentMethod,
-        ...(paymentMethod === 'DINHEIRO' && { amount_received: parseFloat(amountReceived) })
-      };
-
-      console.log('Processing checkout with:', checkoutData);
-      const result = await cartService.checkout(
-        paymentMethod,
-        paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cartTotal
-      );
-      
-      console.log('Checkout successful:', result);
-      
-      // Clear local cart and reset form
-      setCart([]);
-      setPaymentMethod('DINHEIRO');
+      const result = await cartService.checkout(paymentMethod, amountReceived);
+      // Handle successful sale
+      setCart({ items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 });
       setAmountReceived('');
-      
-      // Show success message
-      setError('Venda registrada com sucesso!');
-      setTimeout(() => setError(''), 3000);
-      
-      return result;
-      
-    } catch (error) {
-      console.error('Error processing sale:', {
-        error: error.message,
-        status: error.status,
-        response: error.response
-      });
-      
-      let errorMessage = 'Erro ao processar venda';
-      
-      if (error.message === 'Failed to fetch') {
-        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
-      } else if (error.status === 401) {
-        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
-      } else if (error.status >= 500) {
-        errorMessage = 'Erro no servidor. Por favor, tente novamente mais tarde.';
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setError(`Erro: ${errorMessage}`);
-      throw error;
+      alert('Venda realizada com sucesso!');
+    } catch (err) {
+      setError(err.message || 'Erro ao processar venda');
+      console.error('Erro ao processar venda:', err);
     } finally {
       setProcessing(false);
     }
@@ -312,43 +127,61 @@ const PDV = () => {
     }).format(value);
   };
 
+  // Format weight
+  const formatWeight = (weight) => {
+    return parseFloat(weight).toFixed(3);
+  };
+
+  // Toggle cart visibility on mobile
+  const toggleCart = () => {
+    setShowCart(!showCart);
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Ponto de Venda</h1>
-            <div className="w-1/3">
+      <header className="bg-white shadow sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-3">
+          <div className="flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Ponto de Venda</h1>
+            <div className="w-full sm:w-1/2 md:w-1/3">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
+                  <Search className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                 </div>
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Buscar produto por código, nome ou descrição"
+                  className="block w-full pl-9 sm:pl-10 pr-3 py-1.5 sm:py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
+                  placeholder="Buscar produto..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
+            {/* Mobile cart button */}
+            <button 
+              onClick={toggleCart}
+              className="sm:hidden flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <ShoppingCart className="h-5 w-5 mr-1" />
+              <span>{cart.itemCount}</span>
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 h-full flex">
-          {/* Products List - Takes 8 columns */}
-          <div className="w-2/3 pr-4 h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 h-full flex flex-col lg:flex-row">
+          {/* Products List - Full width on mobile, 2/3 on larger screens */}
+          <div className={`w-full lg:w-2/3 lg:pr-4 h-full flex flex-col mb-4 lg:mb-0 ${showCart ? 'hidden lg:flex' : 'flex'}`}>
+            <div className="flex-1 overflow-y-auto bg-white shadow sm:rounded-lg">
               {loading ? (
                 <div className="flex justify-center items-center h-64">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 </div>
               ) : error ? (
-                <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 m-2">
                   <div className="flex">
                     <div className="flex-shrink-0">
                       <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
@@ -361,20 +194,20 @@ const PDV = () => {
                   </div>
                 </div>
               ) : filteredProducts.length > 0 ? (
-                <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Produto
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Preço
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" className="hidden sm:table-cell px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Estoque
                         </th>
-                        <th scope="col" className="relative px-6 py-3">
+                        <th scope="col" className="relative px-3 sm:px-6 py-3">
                           <span className="sr-only">Ações</span>
                         </th>
                       </tr>
@@ -382,35 +215,25 @@ const PDV = () => {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredProducts.map((product) => (
                         <tr key={product.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                            <div className="text-sm text-gray-500">{product.sku || 'Sem código'}</div>
+                            <div className="text-xs text-gray-500">{product.sku || 'Sem código'}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {formatCurrency(product.sale_price)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="hidden sm:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {product.is_weight_based 
                               ? formatWeight(product.current_stock) + ' kg' 
                               : product.current_stock}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
                               onClick={() => addToCart(product)}
-                              className={`inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white ${
-                                product.current_stock > 0 || product.is_weight_based
-                                  ? product.is_weight_based
-                                    ? 'bg-purple-600 hover:bg-purple-700'
-                                    : 'bg-blue-600 hover:bg-blue-700'
-                                  : 'bg-gray-400 cursor-not-allowed'
-                              }`}
-                              disabled={!product.is_weight_based && product.current_stock <= 0}
-                              title={product.is_weight_based ? 'Adicionar por peso' : 'Adicionar ao carrinho'}
+                              className="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
-                              {product.is_weight_based && <Scale className="h-3 w-3 mr-1" />}
-                              {product.current_stock > 0 || product.is_weight_based
-                                ? product.is_weight_based ? 'Pesar' : 'Adicionar'
-                                : 'Sem Estoque'}
+                              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                              Adicionar
                             </button>
                           </td>
                         </tr>
@@ -426,191 +249,195 @@ const PDV = () => {
             </div>
           </div>
 
-          {/* Right Panel - Shopping Cart - Takes 4 columns */}
-          <div className="w-1/3 bg-white rounded-lg shadow flex flex-col">
-            <div className="p-4 border-b">
-              <h2 className="text-lg font-medium text-gray-900">Carrinho de Compras</h2>
-            </div>
-            
-            <div className="flex-1 overflow-hidden flex flex-col">
-              {cart.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-4">
-                  <ShoppingCart className="h-12 w-12 text-gray-300 mb-2" />
-                  <p>Seu carrinho está vazio</p>
+          {/* Cart - Full width on mobile, 1/3 on larger screens */}
+          <div className={`w-full lg:w-1/3 ${!showCart ? 'hidden lg:block' : ''}`}>
+            <div className="bg-white shadow sm:rounded-lg h-full flex flex-col">
+              <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">
+                    Carrinho <span className="text-gray-500 text-sm">({cart.itemCount} itens)</span>
+                  </h3>
+                  <button 
+                    onClick={toggleCart}
+                    className="lg:hidden text-gray-400 hover:text-gray-500"
+                  >
+                    <span className="sr-only">Fechar carrinho</span>
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-              ) : (
-                <>
-                  <div className={`overflow-y-auto ${cart.length > 2 ? 'max-h-64' : ''}`}>
-                    {cart.map((item, index) => (
-                      <div 
-                        key={`${item.id}-${index}`} 
-                        className="border-b p-4"
-                      >
-                        <div className="flex justify-between items-start">
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4">
+                {cart.items.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ShoppingCart className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">Carrinho vazio</h3>
+                    <p className="mt-1 text-sm text-gray-500">Adicione itens ao carrinho para continuar</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-gray-200">
+                    {cart.items.map((item) => (
+                      <li key={item.id} className="py-4">
+                        <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
-                            <div className="flex justify-between">
-                              <h3 className="text-sm font-medium text-gray-900">
-                                {item.name}
-                                {item.is_weight_based && (
-                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                                    <Scale className="h-3 w-3 mr-1" />
-                                    Peso
-                                  </span>
-                                )}
-                              </h3>
-                              <span className="text-sm font-medium text-gray-900 ml-2 whitespace-nowrap">
-                                {formatCurrency(item.sale_price * item.quantity)}
-                              </span>
-                            </div>
-                            <div className="mt-1 flex items-center text-sm text-gray-500">
-                              <span>
-                                {formatCurrency(item.sale_price)} {item.is_weight_based ? '/kg' : 'un.'}
-                              </span>
-                              <span className="mx-2">×</span>
-                              <span className="font-medium">
-                                {item.is_weight_based ? formatWeight(item.quantity) + ' kg' : item.quantity}
-                              </span>
-                            </div>
+                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {formatCurrency(item.unit_price)} × {item.is_weight_sale ? formatWeight(item.quantity) + 'kg' : item.quantity}
+                            </p>
                           </div>
-                          
-                          <div className="ml-4 flex-shrink-0 flex items-center space-x-1">
+                          <div className="ml-4 flex items-center">
+                            <p className="text-sm font-medium text-gray-900">
+                              {formatCurrency(item.subtotal)}
+                            </p>
                             <button
-                              onClick={() => updateQuantity(item.id, item.quantity - 1, item.is_weight_based)}
-                              className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
-                              title="Remover uma unidade"
-                            >
-                              <Minus className="h-4 w-4" />
-                            </button>
-                            
-                            <span className="text-sm font-medium w-8 text-center">
-                              {item.is_weight_based ? '✏️' : item.quantity}
-                            </span>
-                            
-                            <button
-                              onClick={() => updateQuantity(item.id, item.quantity + 1, item.is_weight_based)}
-                              className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
-                              disabled={!item.is_weight_based && item.quantity >= (item.current_stock || 0)}
-                              title="Adicionar uma unidade"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                            
-                            <button
-                              onClick={() => removeFromCart(item.id)}
-                              className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
-                              title="Remover item"
+                              onClick={async () => {
+                                try {
+                                  await cartService.removeItem(item.id);
+                                  await loadCart();
+                                } catch (err) {
+                                  setError('Erro ao remover item do carrinho');
+                                }
+                              }}
+                              className="ml-2 text-red-600 hover:text-red-900"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
-                      </div>
+                      </li>
                     ))}
+                  </ul>
+                )}
+              </div>
+              
+              <div className="border-t border-gray-200 p-4 bg-gray-50">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(cart.subtotal)}</span>
                   </div>
-
-                  {/* Cart Summary - Fixed at the bottom */}
-                  <div className="border-t p-4 bg-gray-50">
-                    <div className="space-y-4">
-                      <div className="flex justify-between text-sm font-medium">
-                        <span>Subtotal:</span>
-                        <span>{formatCurrency(cartTotal)}</span>
-                      </div>
-                      
-                      {/* Payment Method Selection */}
-                      <div>
-                        <label htmlFor="payment-method" className="block text-sm font-medium text-gray-700 mb-1">
-                          Forma de Pagamento
-                        </label>
-                        <div className="relative">
-                          <select
-                            id="payment-method"
-                            value={paymentMethod}
-                            onChange={(e) => {
-                              setPaymentMethod(e.target.value);
-                              if (e.target.value !== 'DINHEIRO') {
-                                setAmountReceived(cartTotal.toFixed(2));
-                              } else {
-                                setAmountReceived('');
-                              }
-                            }}
-                            className="w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                          >
-                            {PAYMENT_METHODS.map((method) => (
-                              <option key={method.value} value={method.value}>
-                                {method.label}
-                              </option>
-                            ))}
-                          </select>
-                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                            <CreditCard className="h-5 w-5 text-gray-400" />
-                          </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Imposto</span>
+                    <span>{formatCurrency(cart.tax_amount)}</span>
+                  </div>
+                  <div className="flex justify-between text-base font-medium text-gray-900 pt-2 border-t border-gray-200 mt-2">
+                    <span>Total</span>
+                    <span>{formatCurrency(cart.total)}</span>
+                  </div>
+                </div>
+                
+                <div className="mt-4 space-y-2">
+                  <div>
+                    <label htmlFor="payment-method" className="block text-sm font-medium text-gray-700 mb-1">
+                      Método de Pagamento
+                    </label>
+                    <select
+                      id="payment-method"
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    >
+                      {PAYMENT_METHODS.map((method) => (
+                        <option key={method.value} value={method.value}>
+                          {method.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {paymentMethod === 'DINHEIRO' && (
+                    <div>
+                      <label htmlFor="amount-received" className="block text-sm font-medium text-gray-700 mb-1">
+                        Valor Recebido
+                      </label>
+                      <div className="mt-1 relative rounded-md shadow-sm">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <DollarSign className="h-5 w-5 text-gray-400" />
                         </div>
+                        <input
+                          type="number"
+                          id="amount-received"
+                          value={amountReceived}
+                          onChange={(e) => setAmountReceived(e.target.value)}
+                          className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
+                          placeholder="0.00"
+                          min={cart.total}
+                          step="0.01"
+                        />
                       </div>
-
-                      {/* Amount Received (only for cash payments) */}
-                      {paymentMethod === 'DINHEIRO' && (
-                        <div>
-                          <label htmlFor="amount-received" className="block text-sm font-medium text-gray-700 mb-1">
-                            Valor Recebido
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              id="amount-received"
-                              value={amountReceived}
-                              onChange={(e) => setAmountReceived(e.target.value)}
-                              min={cartTotal}
-                              step="0.01"
-                              className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                              placeholder="0.00"
-                            />
-                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                              <DollarSign className="h-5 w-5 text-gray-400" />
-                            </div>
-                          </div>
-                          {parseFloat(amountReceived || 0) < cartTotal && paymentMethod === 'DINHEIRO' && (
-                            <p className="mt-1 text-sm text-red-600">
-                              Valor insuficiente. Faltam {formatCurrency(cartTotal - parseFloat(amountReceived || 0))}
-                            </p>
-                          )}
-                        </div>
+                      {amountReceived && parseFloat(amountReceived) > 0 && (
+                        <p className="mt-1 text-sm text-gray-500">
+                          Troco: {formatCurrency(parseFloat(amountReceived) - cart.total)}
+                        </p>
                       )}
-                      
-                      <button
-                        onClick={processSale}
-                        disabled={
-                          cart.length === 0 || 
-                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal) ||
-                          processing
-                        }
-                        className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                          cart.length === 0 || 
-                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal) ||
-                          processing
-                            ? 'bg-gray-400 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700'
-                        }`}
-                      >
-                        Finalizar Venda
-                      </button>
                     </div>
-                  </div>
-                </>
-              )}
+                  )}
+                  
+                  <button
+                    onClick={processSale}
+                    disabled={processing || cart.items.length === 0 || (paymentMethod === 'DINHEIRO' && (!amountReceived || parseFloat(amountReceived) < cart.total))}
+                    className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                      processing || cart.items.length === 0 || (paymentMethod === 'DINHEIRO' && (!amountReceived || parseFloat(amountReceived) < cart.total))
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+                    }`}
+                  >
+                    {processing ? 'Processando...' : 'Finalizar Venda'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </main>
 
+      {/* Mobile bottom bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-2 shadow-lg">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-xs text-gray-500">Total</p>
+            <p className="text-lg font-bold">{formatCurrency(cart.total)}</p>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={toggleCart}
+              className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <ShoppingCart className="h-5 w-5 mr-1" />
+              Ver Carrinho ({cart.itemCount})
+            </button>
+            <button
+              onClick={processSale}
+              disabled={processing || cart.items.length === 0 || (paymentMethod === 'DINHEIRO' && (!amountReceived || parseFloat(amountReceived) < cart.total))}
+              className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                processing || cart.items.length === 0 || (paymentMethod === 'DINHEIRO' && (!amountReceived || parseFloat(amountReceived) < cart.total))
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+              }`}
+            >
+              {processing ? '...' : 'Pagar'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Weight Input Modal */}
       <WeightInputModal
         isOpen={weightInput.isOpen}
         onClose={() => setWeightInput({ ...weightInput, isOpen: false })}
-        productName={weightInput.product?.name || ''}
-        pricePerKg={weightInput.product?.sale_price || 0}
+        product={weightInput.product}
         initialWeight={weightInput.initialWeight}
-        maxWeight={weightInput.product?.track_inventory ? weightInput.product?.current_stock : null}
-        onConfirm={handleWeightConfirm}
+        onConfirm={async (weight, price) => {
+          try {
+            await cartService.addItem(weightInput.product, weight, true, price);
+            await loadCart();
+            setShowCart(true);
+          } catch (err) {
+            setError(err.message || 'Erro ao adicionar item ao carrinho');
+          }
+        }}
       />
     </div>
   );
