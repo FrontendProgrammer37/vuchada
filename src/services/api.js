@@ -48,14 +48,15 @@ class ApiService {
 
         try {
             const response = await fetch(url, config);
+            const responseClone = response.clone(); // Clone the response for potential error handling
             
             if (!response.ok) {
                 let errorMessage = 'Erro na requisição';
                 try {
-                    const errorData = await response.json();
+                    const errorData = await responseClone.json();
                     errorMessage = errorData.detail || JSON.stringify(errorData);
                 } catch (e) {
-                    errorMessage = await response.text();
+                    errorMessage = await responseClone.text();
                 }
                 
                 const error = new Error(errorMessage);
@@ -81,7 +82,7 @@ class ApiService {
                 url,
                 error: error.message,
                 status: error.status,
-                response: error.response ? await error.response.text() : null
+                response: error.response ? await error.response.text().catch(() => 'Não foi possível ler o corpo da resposta') : null
             });
             throw error;
         }
