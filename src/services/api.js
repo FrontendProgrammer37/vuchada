@@ -121,17 +121,18 @@ class ApiService {
     }
 
     async login(username, password) {
-        const formData = new URLSearchParams();
-        formData.append('username', username);
-        formData.append('password', password);
-
-        // O endpoint de login espera 'x-www-form-urlencoded', então não usamos o header padrão
         const data = await this.request('auth/login', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: formData.toString(),
+            body: JSON.stringify({
+                username,
+                password,
+                grant_type: 'password',
+                client_id: 'web',
+                client_secret: 'web-secret'
+            }),
         });
 
         this.setToken(data.access_token);
