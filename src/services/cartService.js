@@ -118,22 +118,27 @@ class CartService {
   }
 
   // Add item to cart
-  async addItem(product, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
+  async addItem(product, quantity = 1, isWeightSale = false, weightInKg = null, customPrice = null) {
     try {
-      // Validate weight for weight-based sales
-      if (isWeightSale && (!weightInKg || parseFloat(weightInKg) <= 0)) {
-        throw new Error('Peso inválido para venda por peso. O peso deve ser maior que zero.');
+      // Validate required fields for weight-based sales
+      if (isWeightSale) {
+        if (!weightInKg || parseFloat(weightInKg) <= 0) {
+          throw new Error('Peso inválido para venda por peso. O peso deve ser maior que zero.');
+        }
+        if (customPrice === null || customPrice === undefined || customPrice === '') {
+          throw new Error('Preço personalizado é obrigatório para venda por peso.');
+        }
       }
 
       const requestBody = {
         product_id: product.id,
         quantity: isWeightSale ? 1 : Math.floor(quantity),
-        is_weight_sale: isWeightSale,
-        weight_in_kg: isWeightSale ? parseFloat(weightInKg) : 0
+        is_weight_sale: isWeightSale
       };
 
-      // Only include custom_price if provided and valid
-      if (customPrice !== null && !isNaN(parseFloat(customPrice))) {
+      // Add weight and custom price for weight-based sales
+      if (isWeightSale) {
+        requestBody.weight_in_kg = parseFloat(weightInKg);
         requestBody.custom_price = parseFloat(customPrice);
       }
 
@@ -151,22 +156,17 @@ class CartService {
     } catch (error) {
       console.error('Failed to add item to cart:', error);
       
-      // If we get a 404, it means the cart doesn't exist yet
+      // Handle specific error cases
       if (error.status === 404) {
-        // Create a new cart by adding the item
+        // If cart doesn't exist, create one and try again
         await this.createCart();
         return this.addItem(product, quantity, isWeightSale, weightInKg, customPrice);
       }
       
-      // For validation errors, extract the error message
-      if (error.status === 422 && error.response) {
-        const errorData = typeof error.response === 'string' ? JSON.parse(error.response) : error.response;
-        if (errorData.detail && Array.isArray(errorData.detail)) {
-          const errorMessage = errorData.detail.map(err => 
-            `${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg || err.type}`
-          ).join('\n');
-          throw new Error(errorMessage || 'Erro de validação ao adicionar item ao carrinho');
-        }
+      // For validation errors, show the backend message
+      if (error.status === 400 || error.status === 422) {
+        const errorMessage = error.response?.detail || error.message || 'Erro ao adicionar item ao carrinho';
+        throw new Error(errorMessage);
       }
       
       throw error;
@@ -182,15 +182,15 @@ class CartService {
   }
 
   // Remove item from cart
-  async removeItem(itemId) {
-    return this.makeRequest(`${CART_ENDPOINT}/items/${itemId}`, {
+  async removeItem(productId) {
+    return this.makeRequest(`${CART_ENDPOINT}/cart/items/${productId}`, {
       method: 'DELETE'
     });
   }
 
   // Clear cart
   async clearCart() {
-    return this.makeRequest(`${CART_ENDPOINT}/clear`, {
+    return this.makeRequest(`${CART_ENDPOINT}/cart`, {
       method: 'DELETE'
     });
   }
