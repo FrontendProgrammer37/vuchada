@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiService from '../services/api';
+import cartService from '../services/cartService';
 
 const AuthContext = createContext();
 
@@ -61,10 +62,18 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Logout
-    const logout = () => {
-        apiService.logout();
-        setUser(null);
-        setError(null);
+    const logout = async () => {
+        try {
+            // Limpar o carrinho antes de fazer logout
+            await cartService.clearCart();
+        } catch (error) {
+            console.error('Erro ao limpar carrinho durante logout:', error);
+            // Continua com o logout mesmo se houver erro ao limpar o carrinho
+        } finally {
+            apiService.logout();
+            setUser(null);
+            setError(null);
+        }
     };
 
     // Limpar erro

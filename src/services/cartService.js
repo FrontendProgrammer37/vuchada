@@ -312,9 +312,34 @@ class CartService {
 
   // Clear cart
   async clearCart() {
-    return this.makeRequest(this.ENDPOINTS.CLEAR_CART, {
-      method: 'DELETE'
-    });
+    try {
+      // Tenta limpar o carrinho no servidor
+      await this.makeRequest(this.ENDPOINTS.CLEAR_CART, {
+        method: 'DELETE'
+      });
+      
+      // Limpa o carrinho localmente
+      this.resetLocalCart();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      // Mesmo que falhe no servidor, limpa localmente
+      this.resetLocalCart();
+      throw error;
+    }
+  }
+  
+  // Reseta o carrinho localmente
+  resetLocalCart() {
+    // Gera um novo sessionId para forçar um novo carrinho
+    this.sessionId = generateSessionId();
+    this.isInitialized = false;
+    
+    // Limpa qualquer estado local se necessário
+    if (this.cart) {
+      this.cart = this.getEmptyCart();
+    }
   }
 
   // Checkout
