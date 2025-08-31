@@ -43,8 +43,10 @@ class ApiService {
 
     // Função genérica para fazer requisições
     async request(endpoint, options = {}) {
+        // Ensure endpoint is a string before calling string methods
+        const endpointStr = String(endpoint || '');
         // Remove a barra inicial se existir para evitar duplicação
-        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+        const normalizedEndpoint = endpointStr.startsWith('/') ? endpointStr.substring(1) : endpointStr;
         const url = `${this.baseURL}/${normalizedEndpoint}`;
         
         const config = {
@@ -58,7 +60,10 @@ class ApiService {
         // Se tiver corpo na requisição, converte para JSON
         if (options.body) {
             config.body = JSON.stringify(options.body);
-            config.headers['Content-Type'] = 'application/json';
+            config.headers = {
+                ...config.headers,
+                'Content-Type': 'application/json'
+            };
         }
 
         try {
@@ -79,7 +84,10 @@ class ApiService {
             }
 
             if (!response.ok) {
-                const error = new Error(responseData?.detail || responseData?.message || 'Erro na requisição');
+                const error = new Error(
+                    (responseData && (responseData.detail || responseData.message)) || 
+                    'Erro na requisição'
+                );
                 error.status = response.status;
                 error.response = responseData;
                 throw error;

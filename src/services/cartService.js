@@ -40,72 +40,66 @@ class CartService {
 
   // Initialize cart if it doesn't exist
   async initializeCart() {
-    if (this.isInitialized) return this.getCart();
+    if (this.isInitialized) {
+      return this.getCart();
+    }
     
     try {
-      // First try to get existing cart
       const cart = await this.getCart();
       this.isInitialized = true;
       return cart;
     } catch (error) {
       console.error('Error initializing cart:', error);
-      this.isInitialized = true; // Mark as initialized to prevent infinite loops
-      return this.createCart();
+      // Even if there's an error, mark as initialized to prevent infinite loops
+      this.isInitialized = true;
+      
+      // Return empty cart structure
+      return { 
+        items: [], 
+        subtotal: 0, 
+        tax_amount: 0, 
+        total: 0, 
+        itemCount: 0,
+        total_quantity: 0 
+      };
     }
   }
 
   // Make API request with retry logic
   async makeRequest(endpoint, options = {}, isRetry = false) {
     try {
-      const response = await apiService.request({
-        url: endpoint,
-        method: options.method || 'GET',
-        data: options.body,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-ID': this.sessionId,
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          ...(options.headers || {})
-        }
-      });
-      
-      return response.data;
-    } catch (error) {
-      // Handle 401 Unauthorized (token expired)
-      if (error.response?.status === 401 && !isRetry) {
-        try {
-          // Try to refresh token
-          const newToken = await apiService.refreshToken();
-          if (newToken) {
-            // Retry the request with new token
-            return this.makeRequest(endpoint, {
-              ...options,
-              headers: {
-                ...options.headers,
-                'Authorization': `Bearer ${newToken}`
-              }
-            }, true);
+      const response = await apiService.request(
+        endpoint,
+        {
+          method: options.method || 'GET',
+          body: options.body,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Session-ID': this.sessionId,
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            ...(options.headers || {})
           }
+        }
+      );
+      return response;
+    } catch (error) {
+      // If we get a 401 and haven't retried yet, try to refresh the token
+      if (error.status === 401 && !isRetry) {
+        try {
+          await apiService.refreshToken();
+          // Retry the request with the new token
+          return this.makeRequest(endpoint, options, true);
         } catch (refreshError) {
           console.error('Failed to refresh token:', refreshError);
-          window.location.href = '/login';
           throw new Error('Sessão expirada. Por favor, faça login novamente.');
         }
       }
-
-      // Handle 404 for cart (cart not found is a valid state)
-      if (error.response?.status === 404 && endpoint === CART_ENDPOINT) {
-        throw { status: 404, response: error.response.data };
-      }
-
-      // For other errors, log and rethrow
-      console.error(`API request failed: ${endpoint}`, error);
-      throw {
-        status: error.response?.status,
-        message: error.message,
-        response: error.response?.data,
-        url: error.config?.url
-      };
+      
+      // Re-throw the error with more context
+      const enhancedError = new Error(error.message || 'Erro na requisição');
+      enhancedError.status = error.status;
+      enhancedError.response = error.response;
+      throw enhancedError;
     }
   }
 
@@ -116,14 +110,14 @@ class CartService {
       return response;
     } catch (error) {
       if (error.status === 404) {
-        // Return empty cart structure when cart is not found
+        // Return empty cart structure if cart doesn't exist
         return { 
           items: [], 
           subtotal: 0, 
           tax_amount: 0, 
           total: 0, 
           itemCount: 0,
-          total_quantity: 0
+          total_quantity: 0 
         };
       }
       console.error('Error getting cart:', error);
