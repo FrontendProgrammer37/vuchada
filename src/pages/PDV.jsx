@@ -346,8 +346,12 @@ const PDV = () => {
                             <button
                               onClick={async () => {
                                 try {
-                                  const updatedCart = await cartService.removeItem(item.id);
-                                  setCart(updatedCart);
+                                  const updatedCart = await cartService.removeItem(item.product_id || item.id);
+                                  setCart({
+                                    ...updatedCart,
+                                    itemCount: updatedCart.items?.length || 0,
+                                    tax_amount: updatedCart.tax_amount || 0
+                                  });
                                 } catch (err) {
                                   console.error('Erro ao remover item:', err);
                                   setError(err.message || 'Erro ao remover item do carrinho');

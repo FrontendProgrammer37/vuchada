@@ -148,20 +148,53 @@ class CartService {
     }
   }
 
-  // Get current cart
+  // Get cart from server
   async getCart() {
     try {
-      console.log('Fetching cart...');
-      const cart = await this.makeRequest(this.ENDPOINTS.GET_CART);
-      return this.normalizeCart(cart);
-    } catch (error) {
-      console.log('Error getting cart, creating new one...', error);
-      // Se o carrinho não existir (404), cria um novo
-      if (error.status === 404) {
-        return this.createCart();
+      console.log('Fetching cart from server...');
+      
+      const response = await this.makeRequest(
+        this.ENDPOINTS.CART,
+        { method: 'GET' }
+      );
+      
+      console.log('Cart response from server:', response);
+      
+      // Garante que a resposta tenha o formato esperado
+      if (!response) {
+        console.warn('Resposta vazia do servidor, retornando carrinho vazio');
+        return {
+          items: [],
+          subtotal: 0,
+          total: 0,
+          item_count: 0
+        };
       }
-      // Se for outro erro, retorna um carrinho vazio
-      return this.getEmptyCart();
+      
+      // Retorna o carrinho formatado corretamente
+      return {
+        items: Array.isArray(response.items) ? response.items : [],
+        subtotal: parseFloat(response.subtotal) || 0,
+        total: parseFloat(response.total) || 0,
+        item_count: Array.isArray(response.items) ? response.items.length : 0
+      };
+      
+    } catch (error) {
+      console.error('Erro ao buscar carrinho:', error);
+      
+      // Se o carrinho não existir (404), retorna um carrinho vazio
+      if (error.status === 404) {
+        console.log('Carrinho não encontrado, retornando vazio');
+        return {
+          items: [],
+          subtotal: 0,
+          total: 0,
+          item_count: 0
+        };
+      }
+      
+      // Para outros erros, propaga a exceção
+      throw new Error('Erro ao carregar o carrinho. Tente novamente.');
     }
   }
   
@@ -214,10 +247,18 @@ class CartService {
 
       console.log('Backend response:', response);
       
-      // After adding item, fetch the updated cart
-      const updatedCart = await this.getCart();
-      console.log('Updated cart:', updatedCart);
-      return updatedCart;
+      // Se a resposta já contiver os itens atualizados, retorna formatado
+      if (response && Array.isArray(response.items)) {
+        return {
+          items: response.items,
+          subtotal: response.subtotal || 0,
+          total: response.total || 0,
+          item_count: response.items.length
+        };
+      }
+      
+      // Caso contrário, busca o carrinho atualizado
+      return this.getCart();
       
     } catch (error) {
       console.error('Failed to add item to cart:', error);
@@ -283,7 +324,7 @@ class CartService {
       
       // Usando o endpoint correto para remoção
       const response = await this.makeRequest(
-        `/cart/items/${productId}`,
+        `${this.ENDPOINTS.CART}/items/${productId}`,
         { 
           method: 'DELETE',
           body: null // Garante que não há corpo na requisição DELETE
@@ -292,15 +333,23 @@ class CartService {
       
       console.log('Remove item response:', response);
       
-      // Retorna o carrinho atualizado
-      const updatedCart = await this.getCart();
-      console.log('Updated cart after removal:', updatedCart);
-      return updatedCart;
+      // Se a resposta já contém os itens atualizados, retorna diretamente
+      if (response && Array.isArray(response.items)) {
+        return {
+          items: response.items,
+          subtotal: response.subtotal || 0,
+          total: response.total || 0,
+          item_count: response.items.length
+        };
+      }
+      
+      // Caso contrário, busca o carrinho atualizado
+      return this.getCart();
       
     } catch (error) {
       console.error('Erro ao remover item do carrinho:', error);
       
-      // Se o item não for encontrado, apenas retorna o carrinho atual
+      // Se o item não for encontrado, retorna o carrinho atual
       if (error.status === 404) {
         console.warn('Item não encontrado no carrinho, atualizando carrinho...');
         return this.getCart();
@@ -313,33 +362,64 @@ class CartService {
   // Clear cart
   async clearCart() {
     try {
+      console.log('Clearing cart...');
+      
       // Tenta limpar o carrinho no servidor
-      await this.makeRequest(this.ENDPOINTS.CLEAR_CART, {
+      const response = await this.makeRequest(this.ENDPOINTS.CART, {
         method: 'DELETE'
       });
       
-      // Limpa o carrinho localmente
+      console.log('Clear cart response:', response);
+      
+      // Gera um novo sessionId para evitar problemas de cache
       this.resetLocalCart();
       
-      return { success: true };
+      // Retorna o carrinho vazio
+      return {
+        items: [],
+        subtotal: 0,
+        total: 0,
+        item_count: 0
+      };
+      
     } catch (error) {
-      console.error('Erro ao limpar carrinho:', error);
-      // Mesmo que falhe no servidor, limpa localmente
+      console.error('Failed to clear cart:', error);
+      
+      // Mesmo se falhar no servidor, limpa o carrinho localmente
       this.resetLocalCart();
-      throw error;
+      
+      // Se for um erro 404, o carrinho já estava vazio
+      if (error.status === 404) {
+        return {
+          items: [],
+          subtotal: 0,
+          total: 0,
+          item_count: 0
+        };
+      }
+      
+      throw new Error(error.response?.detail || 'Falha ao limpar o carrinho');
     }
   }
   
-  // Reseta o carrinho localmente
+  // Reset local cart and generate new session ID
   resetLocalCart() {
-    // Gera um novo sessionId para forçar um novo carrinho
-    this.sessionId = generateSessionId();
-    this.isInitialized = false;
+    console.log('Resetting local cart and generating new session ID');
     
-    // Limpa qualquer estado local se necessário
-    if (this.cart) {
-      this.cart = this.getEmptyCart();
-    }
+    // Gera um novo sessionId
+    this.sessionId = generateSessionId();
+    
+    // Limpa qualquer dado local relacionado ao carrinho
+    localStorage.removeItem('cart');
+    
+    console.log(`New session ID: ${this.sessionId}`);
+    
+    return {
+      items: [],
+      subtotal: 0,
+      total: 0,
+      item_count: 0
+    };
   }
 
   // Checkout
@@ -363,40 +443,55 @@ class CartService {
 
     const checkoutData = {
       payment_method: paymentMethod,
+      amount_received: parseFloat(amountReceived) || 0,
       customer_id: customerId,
       discount: parseFloat(discount) || 0,
       notes: notes,
       change_for: 0 // Será calculado no backend
     };
-    
-    // Adiciona amount_received apenas para pagamento em dinheiro
-    if (paymentMethod === 'DINHEIRO' && amountReceived) {
-      checkoutData.amount_received = parseFloat(amountReceived);
-    }
 
     try {
-      const response = await this.makeRequest(this.ENDPOINTS.CHECKOUT, {
-        method: 'POST',
-        body: checkoutData
-      });
+      console.log('Enviando dados de checkout:', checkoutData);
+      
+      const response = await this.makeRequest(
+        `${this.ENDPOINTS.CHECKOUT}`,
+        {
+          method: 'POST',
+          body: checkoutData
+        }
+      );
 
-      // Limpa o carrinho após checkout bem-sucedido
+      console.log('Resposta do checkout:', response);
+      
+      // Limpa o carrinho após o checkout bem-sucedido
       await this.clearCart();
       
-      return response;
-    } catch (error) {
-      console.error('Erro ao finalizar compra:', error);
+      // Retorna os dados da venda
+      return {
+        success: true,
+        sale_number: response.sale_number || '',
+        total_amount: response.total_amount || 0,
+        change: response.change || 0,
+        sale_id: response.sale_id || null,
+        timestamp: response.timestamp || new Date().toISOString()
+      };
       
-      // Tratamento de erros específicos
-      if (error.status === 400) {
-        throw new Error('Dados inválidos para finalizar a compra');
-      } else if (error.status === 422) {
-        throw new Error('Erro de validação: ' + (error.detail || 'Verifique os dados informados'));
-      } else if (error.status === 404) {
-        throw new Error('Carrinho não encontrado');
-      } else {
-        throw new Error('Erro ao processar o pagamento. Tente novamente.');
+    } catch (error) {
+      console.error('Erro ao processar checkout:', error);
+      
+      // Para erros de validação, mostra a mensagem do backend
+      if (error.status === 400 || error.status === 422) {
+        const errorMessage = error.response?.detail || error.message || 'Erro ao processar o pagamento';
+        throw new Error(errorMessage);
       }
+      
+      // Para erros de autenticação, limpa o carrinho e força novo login
+      if (error.status === 401) {
+        await this.clearCart();
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      
+      throw error;
     }
   }
 
