@@ -65,11 +65,11 @@ const PDV = () => {
       setCart(cartData);
     } catch (err) {
       console.error('Erro ao carregar carrinho:', err);
-      // Initialize empty cart if not found
       if (err.status === 404) {
+        // Initialize empty cart if not found
         setCart({ items: [], subtotal: 0, tax_amount: 0, total: 0 });
       } else {
-        setError('Erro ao carregar carrinho');
+        setError(err.message || 'Erro ao carregar carrinho');
       }
     }
   };
@@ -92,11 +92,11 @@ const PDV = () => {
 
       // Add item to cart (will create cart if it doesn't exist)
       const updatedCart = await cartService.addItem(product, 1, false);
-      setCart(updatedCart);
+      setCart(prevCart => ({...prevCart, ...updatedCart}));
       
     } catch (err) {
       console.error('Erro ao adicionar item:', err);
-      setError('Erro ao adicionar item ao carrinho');
+      setError(err.message || 'Erro ao adicionar item ao carrinho');
     } finally {
       setLoading(false);
     }

@@ -18,11 +18,17 @@ class CartService {
   }
 
   // Create a new cart by adding an item
-  async createCart(product, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
+  async createCart(product = null, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
     try {
-      const response = await this.addItem(product, quantity, isWeightSale, weightInKg, customPrice);
-      this.isInitialized = true;
-      return response;
+      if (product) {
+        const response = await this.addItem(product, quantity, isWeightSale, weightInKg, customPrice);
+        this.isInitialized = true;
+        return response;
+      } else {
+        // Just mark as initialized without adding any items
+        this.isInitialized = true;
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0 };
+      }
     } catch (error) {
       console.error('Failed to create cart:', error);
       throw error;
@@ -40,9 +46,8 @@ class CartService {
       return cart;
     } catch (error) {
       if (error.status === 404) {
-        // Cart will be created when first item is added
-        this.isInitialized = true;
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0 };
+        // Cart doesn't exist, create an empty one
+        return this.createCart();
       }
       throw error;
     }
@@ -93,18 +98,11 @@ class CartService {
       }
 
       // Handle 404 for cart
-      if (error.status === 404 && endpoint === CART_ENDPOINT && !isRetry) {
-        // Try to create a new cart
-        try {
-          await this.createCart();
-          // Retry the original request
-          return this.makeRequest(endpoint, options, true);
-        } catch (createError) {
-          console.error('Failed to create cart:', createError);
-          return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
-        }
+      if (error.status === 404 && endpoint === CART_ENDPOINT) {
+        throw error; // Let the calling method handle 404
       }
 
+      // For other errors, log and rethrow
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
     }
@@ -118,17 +116,23 @@ class CartService {
   // Add item to cart
   async addItem(product, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
     try {
+      const requestBody = {
+        product_id: product.id,
+        quantity: isWeightSale ? 1 : Math.floor(quantity),
+        is_weight_sale: isWeightSale,
+        weight_in_kg: isWeightSale ? parseFloat(weightInKg) : 0
+      };
+
+      // Only include custom_price if provided
+      if (customPrice !== null) {
+        requestBody.custom_price = parseFloat(customPrice);
+      }
+
       const response = await this.makeRequest(
         `${CART_ENDPOINT}/add`,
         {
           method: 'POST',
-          body: {
-            product_id: product.id,
-            quantity,
-            is_weight_sale: isWeightSale,
-            weight_in_kg: weightInKg,
-            custom_price: customPrice
-          }
+          body: requestBody
         }
       );
       
