@@ -57,16 +57,13 @@ class ApiService {
             credentials: 'include', // Inclui credenciais se necessário
         };
 
-        // Se tiver corpo na requisição e não for um método que não deve ter corpo
-        if (options.body && !['GET', 'HEAD', 'DELETE'].includes(options.method?.toUpperCase())) {
+        // Se tiver corpo na requisição, converte para JSON
+        if (options.body) {
             config.body = JSON.stringify(options.body);
             config.headers = {
                 ...config.headers,
                 'Content-Type': 'application/json'
             };
-        } else if (options.body === null) {
-            // Se body for explicitamente null, remove a propriedade
-            delete config.body;
         }
 
         try {
@@ -104,6 +101,12 @@ class ApiService {
                 status: error.status,
                 response: error.response
             });
+            
+            // Se for um erro de rede, adiciona um status
+            if (!error.status) {
+                error.status = 0; // Network error
+            }
+            
             throw error;
         }
     }
