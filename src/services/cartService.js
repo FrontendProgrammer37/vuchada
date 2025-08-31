@@ -108,47 +108,33 @@ class CartService {
     try {
       const response = await this.makeRequest(CART_ENDPOINT);
       
-      // Ensure all prices are numbers and have consistent structure
       if (response) {
-        response.items = (response.items || []).map(item => ({
-          ...item,
-          price: parseFloat(item.price || 0),
-          subtotal: parseFloat(item.subtotal || 0),
-          unit_price: parseFloat(item.unit_price || item.price || 0),
-          quantity: parseFloat(item.quantity || 0)
-        }));
-        
-        response.subtotal = parseFloat(response.subtotal || 0);
-        response.tax_amount = parseFloat(response.tax_amount || 0);
-        response.total = parseFloat(response.total || 0);
-        response.itemCount = response.items.length;
-        response.total_quantity = response.items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+        return this.normalizeCart(response);
       }
       
-      return response || {
-        items: [],
-        subtotal: 0,
-        tax_amount: 0,
-        total: 0,
-        itemCount: 0,
-        total_quantity: 0
-      };
+      // If no response, return empty cart
+      return this.getEmptyCart();
       
     } catch (error) {
       if (error.status === 404) {
         // Return empty cart structure if cart doesn't exist
-        return { 
-          items: [], 
-          subtotal: 0, 
-          tax_amount: 0, 
-          total: 0, 
-          itemCount: 0,
-          total_quantity: 0 
-        };
+        return this.getEmptyCart();
       }
       console.error('Error getting cart:', error);
       throw error;
     }
+  }
+  
+  // Get empty cart structure
+  getEmptyCart() {
+    return {
+      items: [],
+      subtotal: 0,
+      tax_amount: 0,
+      total: 0,
+      itemCount: 0,
+      total_quantity: 0
+    };
   }
 
   // Add item to cart
@@ -237,14 +223,27 @@ class CartService {
     }
     
     try {
-      await this.makeRequest(
+      const response = await this.makeRequest(
         `${CART_ENDPOINT}/items/${productId}`, 
         { method: 'DELETE' }
       );
-      return this.getCart();
+      
+      // Return the updated cart from response or fetch a fresh one
+      if (response && response.items) {
+        return this.normalizeCart(response);
+      }
+      return await this.getCart();
+      
     } catch (error) {
       console.error('Erro ao remover item do carrinho:', error);
-      throw error;
+      
+      // If the item is not found, just return the current cart
+      if (error.status === 404) {
+        console.warn('Item não encontrado no carrinho, atualizando carrinho...');
+        return this.getCart();
+      }
+      
+      throw new Error(error.response?.detail || 'Erro ao remover item do carrinho');
     }
   }
 
@@ -269,6 +268,24 @@ class CartService {
       method: 'POST',
       body: checkoutData
     });
+  }
+
+  normalizeCart(cart) {
+    cart.items = cart.items.map(item => ({
+      ...item,
+      price: parseFloat(item.price || 0),
+      subtotal: parseFloat(item.subtotal || 0),
+      unit_price: parseFloat(item.unit_price || item.price || 0),
+      quantity: parseFloat(item.quantity || 0)
+    }));
+    
+    cart.subtotal = parseFloat(cart.subtotal || 0);
+    cart.tax_amount = parseFloat(cart.tax_amount || 0);
+    cart.total = parseFloat(cart.total || 0);
+    cart.itemCount = cart.items.length;
+    cart.total_quantity = cart.items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+    
+    return cart;
   }
 }
 
