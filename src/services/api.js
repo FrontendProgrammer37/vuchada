@@ -51,48 +51,57 @@ class ApiService {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+            mode: 'cors',
+            credentials: 'include',
+            cache: 'no-cache',
+            redirect: 'follow',
+            referrerPolicy: 'no-referrer',
         };
+
+        // Ensure headers are properly set for JSON requests
+        if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
+            config.body = JSON.stringify(config.body);
+            config.headers['Content-Type'] = 'application/json';
+        }
 
         try {
             const response = await fetch(url, config);
-            const responseClone = response.clone(); // Clone the response for potential error handling
             
-            if (!response.ok) {
-                let errorMessage = 'Erro na requisição';
-                try {
-                    const errorData = await responseClone.json();
-                    errorMessage = errorData.detail || JSON.stringify(errorData);
-                } catch (e) {
-                    errorMessage = await responseClone.text();
-                }
-                
-                const error = new Error(errorMessage);
-                error.status = response.status;
-                error.response = response;
-                throw error;
-            }
-
-            // Se a resposta for 204 (No Content), retorna null
+            // Handle 204 No Content responses
             if (response.status === 204) {
                 return null;
             }
-
-            // Tenta fazer o parse da resposta como JSON
-            try {
-                return await response.json();
-            } catch (e) {
-                console.warn('Resposta não é um JSON válido:', e);
-                return await response.text();
+            
+            // Parse JSON response
+            const data = await response.json().catch(() => ({}));
+            
+            // Handle error responses
+            if (!response.ok) {
+                const error = new Error(data.detail || response.statusText || 'Request failed');
+                error.status = response.status;
+                error.response = response;
+                error.data = data;
+                throw error;
             }
+            
+            return data;
+            
         } catch (error) {
-            console.error('Erro na requisição:', {
+            console.error('API Request Error:', {
                 url,
                 error: error.message,
                 status: error.status,
-                response: error.response ? await error.response.text().catch(() => 'Não foi possível ler o corpo da resposta') : null
+                response: error.response,
+                data: error.data
             });
+            
+            // Handle CORS errors specifically
+            if (error.message === 'Failed to fetch') {
+                const corsError = new Error('Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.');
+                corsError.isCorsError = true;
+                throw corsError;
+            }
+            
             throw error;
         }
     }

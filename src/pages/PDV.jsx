@@ -195,7 +195,7 @@ const PDV = () => {
     
     // Validate payment for cash payments
     if (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal) {
-      alert('Valor recebido é menor que o total da compra');
+      setError('Valor recebido é menor que o total da compra');
       return;
     }
     
@@ -205,6 +205,7 @@ const PDV = () => {
     const addItemsToCart = async (clearFirst = false) => {
       try {
         if (clearFirst) {
+          console.log('Clearing cart before adding items...');
           await apiService.clearCart();
         }
 
@@ -218,14 +219,23 @@ const PDV = () => {
             custom_price: item.sale_price
           };
           
+          console.log('Adding item to cart:', cartItem);
           await apiService.request('cart/add', {
             method: 'POST',
-            body: JSON.stringify(cartItem)
+            body: cartItem,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
           });
         }
         return true;
       } catch (error) {
-        console.error('Error adding items to cart:', error);
+        console.error('Error adding items to cart:', {
+          error: error.message,
+          status: error.status,
+          response: error.response
+        });
         throw error;
       }
     };
@@ -239,6 +249,16 @@ const PDV = () => {
         await addItemsToCart(true);
       }
 
+      // Verify cart contents
+      console.log('Verifying cart contents...');
+      const cartContents = await apiService.request('cart', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      console.log('Cart contents:', cartContents);
+
       // Process checkout
       const checkoutData = {
         payment_method: paymentMethod,
@@ -247,10 +267,17 @@ const PDV = () => {
         amount_received: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cartTotal
       };
 
+      console.log('Processing checkout with:', checkoutData);
       const result = await apiService.request('cart/checkout', {
         method: 'POST',
-        body: JSON.stringify(checkoutData)
+        body: checkoutData,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
+      
+      console.log('Checkout successful:', result);
       
       // Clear local cart and reset form
       setCart([]);
@@ -264,8 +291,26 @@ const PDV = () => {
       return result;
       
     } catch (error) {
-      console.error('Erro ao processar venda:', error);
-      const errorMessage = error.response?.data?.detail || error.message || 'Erro ao processar venda';
+      console.error('Error processing sale:', {
+        error: error.message,
+        status: error.status,
+        response: error.response
+      });
+      
+      let errorMessage = 'Erro ao processar venda';
+      
+      if (error.message === 'Failed to fetch') {
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+      } else if (error.status === 401) {
+        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+      } else if (error.status >= 500) {
+        errorMessage = 'Erro no servidor. Por favor, tente novamente mais tarde.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setError(`Erro: ${errorMessage}`);
       throw error;
     } finally {
