@@ -238,40 +238,13 @@ const PDV = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Header */}
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Ponto de Venda</h1>
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Buscar produto por código, nome ou descrição"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-              <div className="flex items-center">
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                <span>Carrinho ({cart.reduce((acc, item) => acc + item.quantity, 0)})</span>
-              </div>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[calc(100vh-10rem)]">
-          {/* Left Panel - Product List - Takes 8 columns */}
-          <div className="lg:col-span-8 bg-white rounded-lg shadow flex flex-col">
-            <div className="p-4 border-b">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900">Ponto de Venda</h1>
+            <div className="w-1/3">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Search className="h-5 w-5 text-gray-400" />
@@ -285,55 +258,61 @@ const PDV = () => {
                 />
               </div>
             </div>
+          </div>
+        </div>
+      </header>
 
-            <div className="flex-1 overflow-hidden flex flex-col">
+      {/* Main Content */}
+      <main className="flex-1 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 h-full flex">
+          {/* Products List - Takes 8 columns */}
+          <div className="w-2/3 pr-4 h-full flex flex-col">
+            <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                <div className="flex justify-center items-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 </div>
               ) : error ? (
-                <div className="flex-1 flex items-center justify-center text-red-500">
-                  {error}
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700">{error}</p>
+                    </div>
+                  </div>
                 </div>
-              ) : (
-                <div className="overflow-y-auto flex-1">
+              ) : filteredProducts.length > 0 ? (
+                <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0 z-10">
+                    <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preço</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estoque</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Produto
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Preço
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Estoque
+                        </th>
+                        <th scope="col" className="relative px-6 py-3">
+                          <span className="sr-only">Ações</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredProducts.map((product) => (
                         <tr key={product.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {product.sku || 'N/A'}
-                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {product.name}
-                              {product.is_weight_based && (
-                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
-                                  <Scale className="h-3 w-3 mr-1" />
-                                  Peso
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {product.description || 'Sem descrição'}
-                            </div>
+                            <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                            <div className="text-sm text-gray-500">{product.sku || 'Sem código'}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div className="flex flex-col">
-                              <span>{formatCurrency(product.sale_price)}</span>
-                              {product.is_weight_based && (
-                                <span className="text-xs text-gray-500">por kg</span>
-                              )}
-                            </div>
+                            {formatCurrency(product.sale_price)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {product.is_weight_based 
@@ -364,12 +343,16 @@ const PDV = () => {
                     </tbody>
                   </table>
                 </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Nenhum produto encontrado</p>
+                </div>
               )}
             </div>
           </div>
 
           {/* Right Panel - Shopping Cart - Takes 4 columns */}
-          <div className="lg:col-span-4 bg-white rounded-lg shadow flex flex-col">
+          <div className="w-1/3 bg-white rounded-lg shadow flex flex-col">
             <div className="p-4 border-b">
               <h2 className="text-lg font-medium text-gray-900">Carrinho de Compras</h2>
             </div>
@@ -382,16 +365,16 @@ const PDV = () => {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-y-auto flex-1">
+                  <div className={`overflow-y-auto ${cart.length > 2 ? 'max-h-64' : ''}`}>
                     {cart.map((item, index) => (
                       <div 
-                        key={item.id} 
-                        className={`border-b p-4 ${index < 2 ? '' : 'border-t'}`}
+                        key={`${item.id}-${index}`} 
+                        className="border-b p-4"
                       >
                         <div className="flex justify-between items-start">
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between">
-                              <h3 className="text-sm font-medium text-gray-900 truncate">
+                              <h3 className="text-sm font-medium text-gray-900">
                                 {item.name}
                                 {item.is_weight_based && (
                                   <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
@@ -417,38 +400,22 @@ const PDV = () => {
                           
                           <div className="ml-4 flex-shrink-0 flex items-center space-x-1">
                             <button
-                              onClick={() => 
-                                item.is_weight_base
-                                  ? openWeightEditor(item)
-                                  : updateQuantity(item.id, item.quantity - 1, item.is_weight_based)
-                              }
+                              onClick={() => updateQuantity(item.id, item.quantity - 1, item.is_weight_based)}
                               className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
-                              title={item.is_weight_based ? 'Editar quantidade' : 'Remover uma unidade'}
+                              title="Remover uma unidade"
                             >
                               <Minus className="h-4 w-4" />
                             </button>
                             
-                            <button
-                              onClick={() => item.is_weight_based && openWeightEditor(item)}
-                              className={`text-sm font-medium w-8 text-center ${
-                                item.is_weight_based 
-                                  ? 'cursor-pointer text-purple-600 hover:text-purple-800' 
-                                  : ''
-                              }`}
-                              title={item.is_weight_based ? 'Clique para editar o peso' : ''}
-                            >
+                            <span className="text-sm font-medium w-8 text-center">
                               {item.is_weight_based ? '✏️' : item.quantity}
-                            </button>
+                            </span>
                             
                             <button
-                              onClick={() => 
-                                item.is_weight_base
-                                  ? openWeightEditor(item)
-                                  : updateQuantity(item.id, item.quantity + 1, item.is_weight_based)
-                              }
+                              onClick={() => updateQuantity(item.id, item.quantity + 1, item.is_weight_based)}
                               className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
                               disabled={!item.is_weight_based && item.quantity >= (item.current_stock || 0)}
-                              title={item.is_weight_based ? 'Editar quantidade' : 'Adicionar uma unidade'}
+                              title="Adicionar uma unidade"
                             >
                               <Plus className="h-4 w-4" />
                             </button>
