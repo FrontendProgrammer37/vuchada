@@ -121,20 +121,30 @@ class ApiService {
     }
 
     async login(username, password) {
-        const data = await this.request('auth/login', {
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('password', password);
+        formData.append('grant_type', 'password');
+        formData.append('client_id', 'web');
+        formData.append('client_secret', 'web-secret');
+
+        // Usando fetch diretamente para evitar o wrapper request que pode estar adicionando headers indesejados
+        const response = await fetch(`${this.baseURL}/auth/login`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
             },
-            body: JSON.stringify({
-                username,
-                password,
-                grant_type: 'password',
-                client_id: 'web',
-                client_secret: 'web-secret'
-            }),
+            body: formData.toString(),
+            credentials: 'include'
         });
 
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || 'Falha no login');
+        }
+
+        const data = await response.json();
         this.setToken(data.access_token);
         return data;
     }
