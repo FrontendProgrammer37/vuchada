@@ -17,32 +17,44 @@ class CartService {
     this.isInitialized = false;
   }
 
+  // Create a new cart
+  async createCart() {
+    try {
+      const response = await this.makeRequest(CART_ENDPOINT, {
+        method: 'POST',
+        body: {}
+      }, true);
+      this.isInitialized = true;
+      return response;
+    } catch (error) {
+      console.error('Failed to create cart:', error);
+      throw error;
+    }
+  }
+
   // Initialize cart if it doesn't exist
   async initializeCart() {
     if (this.isInitialized) return;
     
     try {
-      // Try to get existing cart
-      await this.getCart();
+      // First try to get existing cart
+      const cart = await this.getCart();
+      this.isInitialized = true;
+      return cart;
     } catch (error) {
       if (error.status === 404) {
         // Cart doesn't exist, create a new one
-        await this.makeRequest(CART_ENDPOINT, { method: 'POST' });
-      } else {
-        console.error('Failed to initialize cart:', error);
-        throw error;
+        return this.createCart();
       }
+      throw error;
     }
-    
-    this.isInitialized = true;
   }
 
   // Make API request with retry logic
-  async makeRequest(endpoint, options = {}, retryCount = 0) {
+  async makeRequest(endpoint, options = {}, isRetry = false) {
     // Ensure we have a valid auth token
     const token = localStorage.getItem('token');
     if (!token && !endpoint.includes('auth')) {
-      // Redirect to login if not authenticated
       window.location.href = '/login';
       throw new Error('Not authenticated');
     }
@@ -62,44 +74,37 @@ class CartService {
     } catch (error) {
       // Handle 401 Unauthorized
       if (error.status === 401) {
-        if (retryCount < MAX_RETRIES) {
-          try {
-            // Try to refresh token
-            const newToken = await apiService.refreshToken();
-            if (newToken) {
-              // Retry with new token
-              return this.makeRequest(endpoint, {
-                ...options,
-                headers: {
-                  ...options.headers,
-                  'Authorization': `Bearer ${newToken}`
-                }
-              }, retryCount + 1);
-            }
-          } catch (refreshError) {
-            console.error('Failed to refresh token:', refreshError);
-            // Redirect to login on refresh failure
-            window.location.href = '/login';
-            throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        try {
+          // Try to refresh token
+          const newToken = await apiService.refreshToken();
+          if (newToken) {
+            // Retry with new token
+            return this.makeRequest(endpoint, {
+              ...options,
+              headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${newToken}`
+              }
+            }, true);
           }
+        } catch (refreshError) {
+          console.error('Failed to refresh token:', refreshError);
+          window.location.href = '/login';
+          throw new Error('Sessão expirada. Por favor, faça login novamente.');
         }
-        window.location.href = '/login';
-        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
 
       // Handle 404 for cart
-      if (error.status === 404 && endpoint === CART_ENDPOINT) {
-        // Try to create a new cart if it doesn't exist
-        if (options.method === 'GET' && retryCount === 0) {
-          try {
-            await this.makeRequest(CART_ENDPOINT, { method: 'POST' });
-            return this.makeRequest(endpoint, options, retryCount + 1);
-          } catch (createError) {
-            console.error('Failed to create cart:', createError);
-            return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
-          }
+      if (error.status === 404 && endpoint === CART_ENDPOINT && !isRetry) {
+        // Try to create a new cart
+        try {
+          await this.createCart();
+          // Retry the original request
+          return this.makeRequest(endpoint, options, true);
+        } catch (createError) {
+          console.error('Failed to create cart:', createError);
+          return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
         }
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
       }
 
       console.error(`API request failed: ${endpoint}`, error);
@@ -114,20 +119,27 @@ class CartService {
 
   // Add item to cart
   async addItem(product, quantity = 1, isWeightBased = false, customPrice = null) {
-    const itemData = {
-      product_id: product.id,
-      quantity: isWeightBased ? parseFloat(quantity) : Math.floor(quantity),
-      is_weight_sale: isWeightBased,
-    };
+    try {
+      await this.initializeCart();
+      
+      const itemData = {
+        product_id: product.id,
+        quantity: isWeightBased ? parseFloat(quantity) : Math.floor(quantity),
+        is_weight_sale: isWeightBased,
+      };
 
-    if (customPrice) {
-      itemData.custom_price = parseFloat(customPrice);
+      if (customPrice) {
+        itemData.custom_price = parseFloat(customPrice);
+      }
+
+      return this.makeRequest(`${CART_ENDPOINT}/add`, {
+        method: 'POST',
+        body: itemData
+      });
+    } catch (error) {
+      console.error('Error adding item to cart:', error);
+      throw error;
     }
-
-    return this.makeRequest(`${CART_ENDPOINT}/add`, {
-      method: 'POST',
-      body: itemData
-    });
   }
 
   // Update item quantity

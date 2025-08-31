@@ -65,7 +65,18 @@ const PDV = () => {
       setCart(cartData);
     } catch (err) {
       console.error('Erro ao carregar carrinho:', err);
-      setError('Erro ao carregar carrinho');
+      // If cart doesn't exist, try to create a new one
+      if (err.status === 404) {
+        try {
+          const newCart = await cartService.createCart();
+          setCart(newCart);
+        } catch (createErr) {
+          console.error('Erro ao criar carrinho:', createErr);
+          setError('Erro ao inicializar carrinho');
+        }
+      } else {
+        setError('Erro ao carregar carrinho');
+      }
     }
   };
 
@@ -78,23 +89,34 @@ const PDV = () => {
 
   // Add item to cart with inventory control
   const addToCart = async (product) => {
-    if (product.venda_por_peso) {
-      const maxWeight = product.track_inventory ? product.current_stock : null;
-      setWeightInput({
-        isOpen: true,
-        product: { ...product, maxWeight },
-        initialWeight: '0.100',
-        isEditing: false
-      });
-      return;
-    }
-
     try {
+      setLoading(true);
+      
+      if (product.venda_por_peso) {
+        const maxWeight = product.track_inventory ? product.current_stock : null;
+        setWeightInput({
+          isOpen: true,
+          product: { ...product, maxWeight },
+          initialWeight: '0.100',
+          isEditing: false
+        });
+        return;
+      }
+
+      // Ensure cart exists before adding items
+      if (!cart || !cart.id) {
+        await cartService.initializeCart();
+      }
+
       await cartService.addItem(product, 1, false);
-      await loadCart();
-      setShowCart(true);
+      const updatedCart = await cartService.getCart();
+      setCart(updatedCart);
+      
     } catch (err) {
-      setError(err.message || 'Erro ao adicionar item ao carrinho');
+      console.error('Erro ao adicionar item:', err);
+      setError('Erro ao adicionar item ao carrinho');
+    } finally {
+      setLoading(false);
     }
   };
 
