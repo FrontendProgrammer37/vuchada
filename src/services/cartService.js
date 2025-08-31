@@ -18,7 +18,14 @@ const cartService = {
   // Make API request with retry logic
   async makeRequest(endpoint, options = {}, retryCount = 0) {
     try {
-      const response = await apiService.request(endpoint, options);
+      const response = await apiService.request(endpoint, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
       return response;
     } catch (error) {
       // If unauthorized and we have retries left, try to refresh token and retry
@@ -52,12 +59,18 @@ const cartService = {
       product_id: product.id,
       quantity: isWeightBased ? parseFloat(quantity) : Math.floor(quantity),
       is_weight_sale: isWeightBased,
-      ...(customPrice && { custom_price: parseFloat(customPrice) })
     };
+
+    if (customPrice) {
+      itemData.custom_price = parseFloat(customPrice);
+    }
 
     return this.makeRequest(`${CART_ENDPOINT}/add`, {
       method: 'POST',
-      body: itemData
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(itemData)
     });
   },
 
@@ -65,14 +78,20 @@ const cartService = {
   async updateItemQuantity(itemId, quantity) {
     return this.makeRequest(`${CART_ENDPOINT}/items/${itemId}`, {
       method: 'PUT',
-      body: { quantity: parseFloat(quantity) }
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ quantity: parseFloat(quantity) })
     });
   },
 
   // Remove item from cart
   async removeItem(itemId) {
     return this.makeRequest(`${CART_ENDPOINT}/items/${itemId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      }
     });
   },
 
