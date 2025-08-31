@@ -20,10 +20,17 @@ class CartService {
   // Create a new cart
   async createCart() {
     try {
-      // The cart will be created automatically when adding the first item
-      // So we just need to mark it as initialized
+      // The cart will be created when the first item is added
+      // Just mark as initialized and return an empty cart structure
       this.isInitialized = true;
-      return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      return { 
+        items: [], 
+        subtotal: 0, 
+        tax_amount: 0, 
+        total: 0, 
+        itemCount: 0,
+        total_quantity: 0 
+      };
     } catch (error) {
       console.error('Failed to create cart:', error);
       this.isInitialized = true; // Still mark as initialized to prevent infinite loops
@@ -33,7 +40,7 @@ class CartService {
 
   // Initialize cart if it doesn't exist
   async initializeCart() {
-    if (this.isInitialized) return;
+    if (this.isInitialized) return this.getCart();
     
     try {
       // First try to get existing cart
@@ -41,43 +48,36 @@ class CartService {
       this.isInitialized = true;
       return cart;
     } catch (error) {
-      if (error.status === 404) {
-        // Cart doesn't exist, create an empty one
-        return this.createCart();
-      }
-      throw error;
+      console.error('Error initializing cart:', error);
+      this.isInitialized = true; // Mark as initialized to prevent infinite loops
+      return this.createCart();
     }
   }
 
   // Make API request with retry logic
   async makeRequest(endpoint, options = {}, isRetry = false) {
-    // Ensure we have a valid auth token
-    const token = localStorage.getItem('token');
-    if (!token && !endpoint.includes('auth')) {
-      window.location.href = '/login';
-      throw new Error('Not authenticated');
-    }
-
     try {
-      const response = await apiService.request(endpoint, {
-        ...options,
+      const response = await apiService.request({
+        url: endpoint,
+        method: options.method || 'GET',
+        data: options.body,
         headers: {
           'Content-Type': 'application/json',
           'X-Session-ID': this.sessionId,
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           ...(options.headers || {})
-        },
-        body: options.body ? JSON.stringify(options.body) : undefined
+        }
       });
-      return response;
+      
+      return response.data;
     } catch (error) {
-      // Handle 401 Unauthorized
-      if (error.status === 401) {
+      // Handle 401 Unauthorized (token expired)
+      if (error.response?.status === 401 && !isRetry) {
         try {
           // Try to refresh token
           const newToken = await apiService.refreshToken();
           if (newToken) {
-            // Retry with new token
+            // Retry the request with new token
             return this.makeRequest(endpoint, {
               ...options,
               headers: {
@@ -93,26 +93,40 @@ class CartService {
         }
       }
 
-      // Handle 404 for cart
-      if (error.status === 404 && endpoint === CART_ENDPOINT) {
-        throw error; // Let the calling method handle 404
+      // Handle 404 for cart (cart not found is a valid state)
+      if (error.response?.status === 404 && endpoint === CART_ENDPOINT) {
+        throw { status: 404, response: error.response.data };
       }
 
       // For other errors, log and rethrow
       console.error(`API request failed: ${endpoint}`, error);
-      throw error;
+      throw {
+        status: error.response?.status,
+        message: error.message,
+        response: error.response?.data,
+        url: error.config?.url
+      };
     }
   }
 
   // Get current cart
   async getCart() {
     try {
-      return await this.makeRequest(CART_ENDPOINT);
+      const response = await this.makeRequest(CART_ENDPOINT);
+      return response;
     } catch (error) {
       if (error.status === 404) {
-        // Return empty cart if not found
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+        // Return empty cart structure when cart is not found
+        return { 
+          items: [], 
+          subtotal: 0, 
+          tax_amount: 0, 
+          total: 0, 
+          itemCount: 0,
+          total_quantity: 0
+        };
       }
+      console.error('Error getting cart:', error);
       throw error;
     }
   }

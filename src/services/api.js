@@ -55,44 +55,50 @@ class ApiService {
             credentials: 'include', // Inclui credenciais se necessário
         };
 
+        // Se tiver corpo na requisição, converte para JSON
+        if (options.body) {
+            config.body = JSON.stringify(options.body);
+            config.headers['Content-Type'] = 'application/json';
+        }
+
         try {
             const response = await fetch(url, config);
-            const responseClone = response.clone(); // Clone the response for potential error handling
             
-            if (!response.ok) {
-                let errorMessage = 'Erro na requisição';
-                try {
-                    const errorData = await responseClone.json();
-                    errorMessage = errorData.detail || JSON.stringify(errorData);
-                } catch (e) {
-                    errorMessage = await responseClone.text();
-                }
-                
-                const error = new Error(errorMessage);
-                error.status = response.status;
-                error.response = response;
-                throw error;
-            }
-
             // Se a resposta for 204 (No Content), retorna null
             if (response.status === 204) {
                 return null;
             }
 
             // Tenta fazer o parse da resposta como JSON
-            try {
-                return await response.json();
-            } catch (e) {
-                console.warn('Resposta não é um JSON válido:', e);
-                return await response.text();
+            let responseData;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                responseData = await response.json();
+            } else {
+                responseData = await response.text();
             }
+
+            if (!response.ok) {
+                const error = new Error(responseData?.detail || responseData?.message || 'Erro na requisição');
+                error.status = response.status;
+                error.response = responseData;
+                throw error;
+            }
+
+            return responseData;
         } catch (error) {
             console.error('Erro na requisição:', {
                 url,
                 error: error.message,
                 status: error.status,
-                response: error.response ? await error.response.text().catch(() => 'Não foi possível ler o corpo da resposta') : null
+                response: error.response
             });
+            
+            // Se for um erro de rede, adiciona um status
+            if (!error.status) {
+                error.status = 0; // Network error
+            }
+            
             throw error;
         }
     }
