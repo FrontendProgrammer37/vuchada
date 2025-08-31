@@ -23,6 +23,17 @@ class CartService {
     this.checkout = this.checkout.bind(this);
   }
 
+  // Endpoints específicos
+  get ENDPOINTS() {
+    return {
+      CART: CART_ENDPOINT,
+      ADD_ITEM: `${CART_ENDPOINT}/add`,
+      REMOVE_ITEM: (productId) => `${CART_ENDPOINT}/items/${productId}`,
+      CLEAR_CART: `${CART_ENDPOINT}/clear`,
+      CHECKOUT: `${CART_ENDPOINT}/checkout`
+    };
+  }
+
   // Create a new cart
   async createCart() {
     try {
@@ -112,7 +123,7 @@ class CartService {
   // Get current cart
   async getCart() {
     try {
-      const response = await this.makeRequest(CART_ENDPOINT);
+      const response = await this.makeRequest(this.ENDPOINTS.CART);
       
       if (response) {
         return this.normalizeCart(response);
@@ -169,7 +180,7 @@ class CartService {
       }
 
       const response = await this.makeRequest(
-        `${CART_ENDPOINT}/items`,
+        this.ENDPOINTS.ADD_ITEM,
         {
           method: 'POST',
           body: requestBody
@@ -239,7 +250,7 @@ class CartService {
     
     try {
       await this.makeRequest(
-        `${CART_ENDPOINT}/items/${productId}`,
+        this.ENDPOINTS.REMOVE_ITEM(productId),
         { method: 'DELETE' }
       );
       
@@ -261,7 +272,7 @@ class CartService {
 
   // Clear cart
   async clearCart() {
-    return this.makeRequest(`${CART_ENDPOINT}`, {
+    return this.makeRequest(this.ENDPOINTS.CLEAR_CART, {
       method: 'DELETE'
     });
   }
@@ -299,7 +310,7 @@ class CartService {
     }
 
     try {
-      const response = await this.makeRequest(`${CART_ENDPOINT}/checkout`, {
+      const response = await this.makeRequest(this.ENDPOINTS.CHECKOUT, {
         method: 'POST',
         body: checkoutData
       });
