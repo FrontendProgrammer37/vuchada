@@ -346,13 +346,15 @@ const PDV = () => {
                             <button
                               onClick={async () => {
                                 try {
-                                  await cartService.removeItem(item.id);
-                                  await loadCart();
+                                  const updatedCart = await cartService.removeItem(item.id);
+                                  setCart(updatedCart);
                                 } catch (err) {
-                                  setError('Erro ao remover item do carrinho');
+                                  console.error('Erro ao remover item:', err);
+                                  setError(err.message || 'Erro ao remover item do carrinho');
                                 }
                               }}
-                              className="ml-2 text-red-600 hover:text-red-900"
+                              className="text-red-500 hover:text-red-700"
+                              disabled={processing}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>

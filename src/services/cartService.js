@@ -275,13 +275,20 @@ class CartService {
     }
     
     try {
-      await this.makeRequest(
-        this.ENDPOINTS.REMOVE_ITEM(productId),
+      console.log(`Removing item ${productId} from cart`);
+      
+      // Make the DELETE request to the correct endpoint
+      const response = await this.makeRequest(
+        `/cart/items/${productId}`,
         { method: 'DELETE' }
       );
       
+      console.log('Remove item response:', response);
+      
       // Return the updated cart
-      return this.getCart();
+      const updatedCart = await this.getCart();
+      console.log('Updated cart after removal:', updatedCart);
+      return updatedCart;
       
     } catch (error) {
       console.error('Erro ao remover item do carrinho:', error);
