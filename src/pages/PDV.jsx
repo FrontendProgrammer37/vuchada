@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Trash2, ShoppingCart, Scale } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, Scale, CreditCard, DollarSign } from 'lucide-react';
 import apiService from '../services/api';
 import WeightInputModal from '../components/WeightInputModal';
+
+const PAYMENT_METHODS = [
+  { value: 'DINHEIRO', label: 'Dinheiro' },
+  { value: 'MPESA', label: 'M-Pesa' },
+  { value: 'EMOLA', label: 'E-Mola' },
+  { value: 'CARTAO_POS', label: 'Cartão POS' },
+  { value: 'TRANSFERENCIA', label: 'Transferência Bancária' },
+  { value: 'MILLENNIUM', label: 'Millennium BIM' },
+  { value: 'BCI', label: 'BCI' },
+  { value: 'STANDARD_BANK', label: 'Standard Bank' },
+  { value: 'ABSA_BANK', label: 'ABSA Bank' },
+  { value: 'LETSHEGO', label: 'Letshego' },
+  { value: 'MYBUCKS', label: 'MyBucks' }
+];
 
 const PDV = () => {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState('dinheiro');
+  const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
   const [amountReceived, setAmountReceived] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -178,30 +192,40 @@ const PDV = () => {
   const processSale = async () => {
     if (cart.length === 0) return;
     
+    // Validate payment for cash payments
+    if (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal) {
+      alert('Valor recebido é menor que o total da compra');
+      return;
+    }
+    
     try {
       const saleData = {
         items: cart.map(item => ({
           product_id: item.id,
           quantity: item.quantity,
           unit_price: item.sale_price,
-          total_price: item.sale_price * item.quantity
+          total_price: item.sale_price * item.quantity,
+          is_weight_based: item.is_weight_based || false,
+          weight: item.is_weight_based ? item.quantity : null
         })),
         payment_method: paymentMethod,
-        amount_received: parseFloat(amountReceived || cartTotal),
-        total_amount: cartTotal
+        amount_received: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cartTotal,
+        total_amount: cartTotal,
+        change: paymentMethod === 'DINHEIRO' ? (parseFloat(amountReceived) - cartTotal).toFixed(2) : 0
       };
 
       await apiService.createSale(saleData);
       
       // Clear cart and reset form
       setCart([]);
+      setPaymentMethod('DINHEIRO');
       setAmountReceived('');
       
       // Show success message
       alert('Venda realizada com sucesso!');
     } catch (err) {
       console.error('Erro ao processar venda:', err);
-      alert('Erro ao processar venda. Tente novamente.');
+      alert(err.message || 'Erro ao processar venda. Tente novamente.');
     }
   };
 
@@ -450,18 +474,75 @@ const PDV = () => {
                         <span>{formatCurrency(cartTotal)}</span>
                       </div>
                       
-                      {/* Payment method and checkout button remain the same */}
-                      {/* ... (existing payment method and checkout button code) */}
+                      {/* Payment Method Selection */}
+                      <div>
+                        <label htmlFor="payment-method" className="block text-sm font-medium text-gray-700 mb-1">
+                          Forma de Pagamento
+                        </label>
+                        <div className="relative">
+                          <select
+                            id="payment-method"
+                            value={paymentMethod}
+                            onChange={(e) => {
+                              setPaymentMethod(e.target.value);
+                              if (e.target.value !== 'DINHEIRO') {
+                                setAmountReceived(cartTotal.toFixed(2));
+                              } else {
+                                setAmountReceived('');
+                              }
+                            }}
+                            className="w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                          >
+                            {PAYMENT_METHODS.map((method) => (
+                              <option key={method.value} value={method.value}>
+                                {method.label}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <CreditCard className="h-5 w-5 text-gray-400" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Amount Received (only for cash payments) */}
+                      {paymentMethod === 'DINHEIRO' && (
+                        <div>
+                          <label htmlFor="amount-received" className="block text-sm font-medium text-gray-700 mb-1">
+                            Valor Recebido
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              id="amount-received"
+                              value={amountReceived}
+                              onChange={(e) => setAmountReceived(e.target.value)}
+                              min={cartTotal}
+                              step="0.01"
+                              className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                              placeholder="0.00"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                              <DollarSign className="h-5 w-5 text-gray-400" />
+                            </div>
+                          </div>
+                          {parseFloat(amountReceived || 0) < cartTotal && paymentMethod === 'DINHEIRO' && (
+                            <p className="mt-1 text-sm text-red-600">
+                              Valor insuficiente. Faltam {formatCurrency(cartTotal - parseFloat(amountReceived || 0))}
+                            </p>
+                          )}
+                        </div>
+                      )}
                       
                       <button
                         onClick={processSale}
                         disabled={
                           cart.length === 0 || 
-                          (paymentMethod === 'dinheiro' && parseFloat(amountReceived || 0) < cartTotal)
+                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal)
                         }
                         className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
                           cart.length === 0 || 
-                          (paymentMethod === 'dinheiro' && parseFloat(amountReceived || 0) < cartTotal)
+                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal)
                             ? 'bg-gray-400 cursor-not-allowed'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
