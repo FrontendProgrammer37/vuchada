@@ -17,20 +17,16 @@ class CartService {
     this.isInitialized = false;
   }
 
-  // Create a new cart by adding an item
-  async createCart(product = null, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
+  // Create a new cart
+  async createCart() {
     try {
-      if (product) {
-        const response = await this.addItem(product, quantity, isWeightSale, weightInKg, customPrice);
-        this.isInitialized = true;
-        return response;
-      } else {
-        // Just mark as initialized without adding any items
-        this.isInitialized = true;
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0 };
-      }
+      // The cart will be created automatically when adding the first item
+      // So we just need to mark it as initialized
+      this.isInitialized = true;
+      return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
     } catch (error) {
       console.error('Failed to create cart:', error);
+      this.isInitialized = true; // Still mark as initialized to prevent infinite loops
       throw error;
     }
   }
@@ -110,7 +106,15 @@ class CartService {
 
   // Get current cart
   async getCart() {
-    return this.makeRequest(CART_ENDPOINT);
+    try {
+      return await this.makeRequest(CART_ENDPOINT);
+    } catch (error) {
+      if (error.status === 404) {
+        // Return empty cart if not found
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      }
+      throw error;
+    }
   }
 
   // Add item to cart
@@ -133,7 +137,8 @@ class CartService {
         requestBody.custom_price = parseFloat(customPrice);
       }
 
-      const response = await this.makeRequest(
+      // First try to add the item
+      await this.makeRequest(
         `${CART_ENDPOINT}/add`,
         {
           method: 'POST',
@@ -141,11 +146,29 @@ class CartService {
         }
       );
       
-      // Refresh cart data
-      const updatedCart = await this.getCart();
-      return updatedCart;
+      // Then get the updated cart
+      return await this.getCart();
     } catch (error) {
       console.error('Failed to add item to cart:', error);
+      
+      // If we get a 404, it means the cart doesn't exist yet
+      if (error.status === 404) {
+        // Create a new cart by adding the item
+        await this.createCart();
+        return this.addItem(product, quantity, isWeightSale, weightInKg, customPrice);
+      }
+      
+      // For validation errors, extract the error message
+      if (error.status === 422 && error.response) {
+        const errorData = typeof error.response === 'string' ? JSON.parse(error.response) : error.response;
+        if (errorData.detail && Array.isArray(errorData.detail)) {
+          const errorMessage = errorData.detail.map(err => 
+            `${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg || err.type}`
+          ).join('\n');
+          throw new Error(errorMessage || 'Erro de validação ao adicionar item ao carrinho');
+        }
+      }
+      
       throw error;
     }
   }
