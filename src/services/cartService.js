@@ -107,7 +107,33 @@ class CartService {
   async getCart() {
     try {
       const response = await this.makeRequest(CART_ENDPOINT);
-      return response;
+      
+      // Ensure all prices are numbers and have consistent structure
+      if (response) {
+        response.items = (response.items || []).map(item => ({
+          ...item,
+          price: parseFloat(item.price || 0),
+          subtotal: parseFloat(item.subtotal || 0),
+          unit_price: parseFloat(item.unit_price || item.price || 0),
+          quantity: parseFloat(item.quantity || 0)
+        }));
+        
+        response.subtotal = parseFloat(response.subtotal || 0);
+        response.tax_amount = parseFloat(response.tax_amount || 0);
+        response.total = parseFloat(response.total || 0);
+        response.itemCount = response.items.length;
+        response.total_quantity = response.items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0);
+      }
+      
+      return response || {
+        items: [],
+        subtotal: 0,
+        tax_amount: 0,
+        total: 0,
+        itemCount: 0,
+        total_quantity: 0
+      };
+      
     } catch (error) {
       if (error.status === 404) {
         // Return empty cart structure if cart doesn't exist
@@ -160,7 +186,22 @@ class CartService {
       );
       
       // Then get the updated cart
-      return await this.getCart();
+      const updatedCart = await this.getCart();
+      
+      // Ensure all prices are numbers
+      updatedCart.items = updatedCart.items.map(item => ({
+        ...item,
+        price: parseFloat(item.price || 0),
+        subtotal: parseFloat(item.subtotal || 0),
+        unit_price: parseFloat(item.unit_price || item.price || 0)
+      }));
+      
+      updatedCart.subtotal = parseFloat(updatedCart.subtotal || 0);
+      updatedCart.tax_amount = parseFloat(updatedCart.tax_amount || 0);
+      updatedCart.total = parseFloat(updatedCart.total || 0);
+      
+      return updatedCart;
+      
     } catch (error) {
       console.error('Failed to add item to cart:', error);
       
@@ -191,9 +232,20 @@ class CartService {
 
   // Remove item from cart
   async removeItem(productId) {
-    return this.makeRequest(`${CART_ENDPOINT}/cart/items/${productId}`, {
-      method: 'DELETE'
-    });
+    if (!productId) {
+      throw new Error('ID do produto é obrigatório para remoção');
+    }
+    
+    try {
+      await this.makeRequest(
+        `${CART_ENDPOINT}/items/${productId}`, 
+        { method: 'DELETE' }
+      );
+      return this.getCart();
+    } catch (error) {
+      console.error('Erro ao remover item do carrinho:', error);
+      throw error;
+    }
   }
 
   // Clear cart

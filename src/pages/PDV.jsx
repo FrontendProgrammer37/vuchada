@@ -308,14 +308,14 @@ const PDV = () => {
                       <li key={item.id} className="py-4">
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{item.product_name || item.name}</p>
                             <p className="text-sm text-gray-500">
-                              {formatCurrency(item.unit_price)} × {item.is_weight_sale ? formatWeight(item.quantity) + 'kg' : item.quantity}
+                              {formatCurrency(item.price || item.unit_price)} × {item.is_weight_sale ? formatWeight(item.quantity) + 'kg' : item.quantity}
                             </p>
                           </div>
                           <div className="ml-4 flex items-center">
                             <p className="text-sm font-medium text-gray-900">
-                              {formatCurrency(item.subtotal)}
+                              {formatCurrency((item.price || item.unit_price) * item.quantity)}
                             </p>
                             <button
                               onClick={async () => {
