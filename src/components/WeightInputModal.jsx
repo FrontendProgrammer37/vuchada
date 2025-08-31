@@ -3,15 +3,13 @@ import { useState, useEffect } from 'react';
 const WeightInputModal = ({
   isOpen,
   onClose,
-  productName = '',
-  pricePerKg = 0,
+  product = { name: '', sale_price: 0, current_stock: null, track_inventory: false },
   initialWeight = '0.100',
-  maxWeight = null,
   onConfirm,
   isEditing = false
 }) => {
   const [weight, setWeight] = useState(initialWeight);
-  const [value, setValue] = useState('');
+  const [customPrice, setCustomPrice] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -32,14 +30,8 @@ const WeightInputModal = ({
 
   // Calculate value from weight
   const calculateValue = (weight) => {
-    const val = parseFloat(weight) * pricePerKg;
+    const val = parseFloat(weight) * product.sale_price;
     return isNaN(val) ? '0.00' : val.toFixed(2);
-  };
-
-  // Calculate weight from value
-  const calculateWeight = (val) => {
-    const weight = parseFloat(val) / pricePerKg;
-    return isNaN(weight) ? '0.100' : weight.toFixed(3);
   };
 
   useEffect(() => {
@@ -50,7 +42,7 @@ const WeightInputModal = ({
   useEffect(() => {
     if (isOpen && isMounted) {
       setWeight(initialWeight);
-      setValue(calculateValue(initialWeight));
+      setCustomPrice(calculateValue(initialWeight));
       setError('');
       setIsSubmitting(false);
     }
@@ -60,29 +52,26 @@ const WeightInputModal = ({
     const newWeight = e.target.value.replace(',', '.');
     if (/^\d*\.?\d*$/.test(newWeight) || newWeight === '') {
       setWeight(newWeight);
-      setValue(calculateValue(newWeight));
+      setCustomPrice(calculateValue(newWeight));
       validateInput(newWeight);
     }
   };
 
-  const handleValueChange = (e) => {
-    const newValue = e.target.value.replace(',', '.');
-    if (/^\d*\.?\d*$/.test(newValue) || newValue === '') {
-      setValue(newValue);
-      const calculatedWeight = calculateWeight(newValue);
-      setWeight(calculatedWeight);
-      validateInput(calculatedWeight);
+  const handlePriceChange = (e) => {
+    const newPrice = e.target.value.replace(',', '.');
+    if (/^\d*\.?\d*$/.test(newPrice) || newPrice === '') {
+      setCustomPrice(newPrice);
     }
   };
 
   const validateInput = (weight) => {
     const weightNum = parseFloat(weight);
     if (isNaN(weightNum) || weightNum <= 0) {
-      setError('Peso inválido');
+      setError('Peso inválido. O peso deve ser maior que zero.');
       return false;
     }
-    if (maxWeight !== null && weightNum > maxWeight) {
-      setError(`Peso excede o estoque disponível de ${formatWeight(maxWeight)} kg`);
+    if (product.track_inventory && weightNum > product.current_stock) {
+      setError(`Peso excede o estoque disponível de ${formatWeight(product.current_stock)} kg`);
       return false;
     }
     setError('');
@@ -95,9 +84,11 @@ const WeightInputModal = ({
     const weightNum = parseFloat(weight);
     if (!validateInput(weight)) return;
     
+    const priceNum = parseFloat(customPrice) || weightNum * product.sale_price;
+    
     try {
       setIsSubmitting(true);
-      await onConfirm(weightNum);
+      await onConfirm(weightNum, priceNum);
       onClose();
     } catch (err) {
       setError(err.message || 'Erro ao processar o peso');
@@ -115,16 +106,16 @@ const WeightInputModal = ({
       <div className="bg-white rounded-lg w-full max-w-md">
         <div className="p-6">
           <h2 className="text-xl font-bold mb-4">
-            {isEditing ? 'Editar Peso' : 'Venda por Peso'}
+            {isEditing ? 'Editar Item' : 'Adicionar por Peso'}
           </h2>
           
           <div className="mb-4">
-            <p className="font-medium">{productName}</p>
+            <p className="font-medium">{product.name}</p>
             <p className="text-sm text-gray-600">
-              Preço: {formatCurrency(pricePerKg)} / kg
-              {maxWeight !== null && (
+              Preço: {formatCurrency(product.sale_price)} / kg
+              {product.track_inventory && (
                 <span className="block">
-                  Estoque disponível: {formatWeight(maxWeight)} kg
+                  Estoque disponível: {formatWeight(product.current_stock)} kg
                 </span>
               )}
             </p>
@@ -148,12 +139,12 @@ const WeightInputModal = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Valor (MT)
+                Preço Total (MT)
               </label>
               <input
                 type="text"
-                value={value}
-                onChange={handleValueChange}
+                value={customPrice}
+                onChange={handlePriceChange}
                 className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="0.00"
                 disabled={isSubmitting}

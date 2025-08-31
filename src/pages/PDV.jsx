@@ -90,9 +90,16 @@ const PDV = () => {
         return;
       }
 
-      // Add item to cart (will create cart if it doesn't exist)
-      const updatedCart = await cartService.addItem(product, 1, false);
-      setCart(prevCart => ({...prevCart, ...updatedCart}));
+      // For non-weight based items, add directly to cart
+      const updatedCart = await cartService.addItem(
+        product,
+        1, // quantity
+        false, // isWeightSale
+        0, // weightInKg
+        null // customPrice
+      );
+      
+      setCart(updatedCart);
       
     } catch (err) {
       console.error('Erro ao adicionar item:', err);

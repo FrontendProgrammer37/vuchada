@@ -116,6 +116,11 @@ class CartService {
   // Add item to cart
   async addItem(product, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
     try {
+      // Validate weight for weight-based sales
+      if (isWeightSale && (!weightInKg || parseFloat(weightInKg) <= 0)) {
+        throw new Error('Peso inválido para venda por peso. O peso deve ser maior que zero.');
+      }
+
       const requestBody = {
         product_id: product.id,
         quantity: isWeightSale ? 1 : Math.floor(quantity),
@@ -123,8 +128,8 @@ class CartService {
         weight_in_kg: isWeightSale ? parseFloat(weightInKg) : 0
       };
 
-      // Only include custom_price if provided
-      if (customPrice !== null) {
+      // Only include custom_price if provided and valid
+      if (customPrice !== null && !isNaN(parseFloat(customPrice))) {
         requestBody.custom_price = parseFloat(customPrice);
       }
 
