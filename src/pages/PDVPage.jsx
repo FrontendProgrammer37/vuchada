@@ -351,8 +351,55 @@ const PDVPage = () => {
     }
   };
 
-  // Calcular total do carrinho
-  const cartTotal = cart.reduce((total, item) => total + (item.unit_price * item.quantity), 0);
+  // Calcular o total do carrinho
+  const cartTotal = cart.reduce((total, item) => {
+    return total + ((item.unit_price || item.price) * item.quantity);
+  }, 0);
+
+  // Função para verificar se o botão de finalizar deve estar desabilitado
+  const isCheckoutDisabled = () => {
+    if (isLoading || cart.length === 0) return true;
+    if (paymentMethod === 'DINHEIRO') {
+      return !amountReceived || isNaN(parseFloat(amountReceived)) || parseFloat(amountReceived) < cartTotal;
+    }
+    return false;
+  };
+
+  // Atualizar o valor recebido quando o total mudar
+  useEffect(() => {
+    if (paymentMethod !== 'DINHEIRO' && cartTotal > 0) {
+      setAmountReceived(cartTotal.toFixed(2));
+    }
+  }, [cartTotal, paymentMethod]);
+
+  // Renderizar o botão de finalizar venda
+  const renderCheckoutButton = () => (
+    <button
+      onClick={handleCheckout}
+      disabled={isCheckoutDisabled()}
+      className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white mt-4 ${
+        isCheckoutDisabled()
+          ? 'bg-gray-400 cursor-not-allowed'
+          : 'bg-green-600 hover:bg-green-700'
+      }`}
+    >
+      {isLoading ? (
+        <div className="flex items-center justify-center">
+          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Processando...
+        </div>
+      ) : (
+        <div className="flex items-center justify-center">
+          <Check className="mr-2" size={20} />
+          Finalizar Venda
+        </div>
+      )}
+    </button>
+  );
+
   const totalItems = cart.reduce((sum, item) => sum + (item.is_weight_based ? 1 : item.quantity), 0);
   const change = amountReceived ? (parseFloat(amountReceived) - cartTotal).toFixed(2) : 0;
 
@@ -523,13 +570,20 @@ const PDVPage = () => {
                     <div className={`border-t border-gray-200 p-4 bg-white ${cart.length > 2 ? 'overflow-y-auto flex-1' : ''}`}>
                       {/* Payment form */}
                       <div className="space-y-4">
-                        <div>
+                        <div className="mb-4">
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Forma de Pagamento
                           </label>
                           <select
                             value={paymentMethod}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            onChange={(e) => {
+                              setPaymentMethod(e.target.value);
+                              if (e.target.value !== 'DINHEIRO') {
+                                setAmountReceived(cartTotal.toFixed(2));
+                              } else {
+                                setAmountReceived('');
+                              }
+                            }}
                             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                           >
                             {PAYMENT_METHODS.map((method) => (
@@ -542,7 +596,7 @@ const PDVPage = () => {
 
                         {/* Amount Received (only for cash) */}
                         {paymentMethod === 'DINHEIRO' && (
-                          <div>
+                          <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Valor Recebido
                             </label>
@@ -556,7 +610,7 @@ const PDVPage = () => {
                                 onChange={(e) => setAmountReceived(e.target.value)}
                                 className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-12 pr-12 sm:text-sm border-gray-300 rounded-md p-2 border"
                                 placeholder="0.00"
-                                min="0"
+                                min={cartTotal}
                                 step="0.01"
                               />
                             </div>
@@ -591,40 +645,7 @@ const PDVPage = () => {
                         </div>
 
                         {/* Checkout Button */}
-                        <button
-                          onClick={handleCheckout}
-                          disabled={
-                            isLoading ||
-                            cart.length === 0 || 
-                            (paymentMethod === 'DINHEIRO' && 
-                             (isNaN(parseFloat(amountReceived)) || 
-                              parseFloat(amountReceived || 0) < cartTotal))
-                          }
-                          className={`w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white mt-4 ${
-                            isLoading ||
-                            cart.length === 0 || 
-                            (paymentMethod === 'DINHEIRO' && 
-                             (isNaN(parseFloat(amountReceived)) || 
-                              parseFloat(amountReceived || 0) < cartTotal))
-                              ? 'bg-gray-400 cursor-not-allowed'
-                              : 'bg-green-600 hover:bg-green-700'
-                          }`}
-                        >
-                          {isLoading ? (
-                            <div className="flex items-center justify-center">
-                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Processando...
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center">
-                              <Check className="mr-2" size={20} />
-                              Finalizar Venda
-                            </div>
-                          )}
-                        </button>
+                        {renderCheckoutButton()}
                       </div>
                     </div>
                   </>
