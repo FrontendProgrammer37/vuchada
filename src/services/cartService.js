@@ -281,15 +281,18 @@ class CartService {
     try {
       console.log(`Removing item ${productId} from cart`);
       
-      // Make the DELETE request to the correct endpoint
+      // Usando o endpoint correto para remoção
       const response = await this.makeRequest(
         `/cart/items/${productId}`,
-        { method: 'DELETE' }
+        { 
+          method: 'DELETE',
+          body: null // Garante que não há corpo na requisição DELETE
+        }
       );
       
       console.log('Remove item response:', response);
       
-      // Return the updated cart
+      // Retorna o carrinho atualizado
       const updatedCart = await this.getCart();
       console.log('Updated cart after removal:', updatedCart);
       return updatedCart;
@@ -297,7 +300,7 @@ class CartService {
     } catch (error) {
       console.error('Erro ao remover item do carrinho:', error);
       
-      // If item not found, just return current cart
+      // Se o item não for encontrado, apenas retorna o carrinho atual
       if (error.status === 404) {
         console.warn('Item não encontrado no carrinho, atualizando carrinho...');
         return this.getCart();
