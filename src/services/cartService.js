@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CART_ENDPOINT = '/api/v1/cart';
+const CART_ENDPOINT = 'cart';
 
 const cartService = {
   // Generate a unique ID for cart items
@@ -24,136 +24,110 @@ const cartService = {
   },
 
   // Add item to cart with duplicate prevention
-  async addItem(product, quantity = 1, isWeightBased = false) {
+  async addItem(product, quantity = 1, isWeightBased = false, customPrice = null) {
     try {
-      // Get current cart
-      const currentCart = await this.getCart();
-      const existingItem = this.findExistingItem(currentCart.items, product, isWeightBased);
-
-      if (existingItem && !isWeightBased) {
-        // Update quantity for existing non-weight-based item
-        return this.updateItemQuantity(existingItem.id, existingItem.quantity + quantity);
-      }
-
-      // Create new item
-      const itemId = this.generateItemId(product, isWeightBased, quantity);
-      const newItem = {
-        id: itemId,
+      const itemData = {
         product_id: product.id,
-        name: product.name,
         quantity: isWeightBased ? parseFloat(quantity) : Math.floor(quantity),
-        unit_price: product.sale_price,
-        is_weight_based: isWeightBased,
-        product: {
-          id: product.id,
-          name: product.name,
-          sku: product.sku,
-          sale_price: product.sale_price,
-          current_stock: product.current_stock,
-          track_inventory: product.track_inventory,
-          is_weight_based: product.is_weight_based
-        }
+        is_weight_sale: isWeightBased,
+        ...(customPrice && { custom_price: parseFloat(customPrice) })
       };
 
-      // Add to cart
       const response = await apiService.request(`${CART_ENDPOINT}/add`, {
         method: 'POST',
-        body: newItem
+        body: JSON.stringify(itemData)
       });
-
+      
       return response;
     } catch (error) {
-      console.error('Erro ao adicionar item ao carrinho:', error);
+      console.error('Error adding item to cart:', error);
       throw error;
     }
   },
 
-  // Update existing methods to work with the new ID system
+  // Update item quantity
   async updateItemQuantity(itemId, quantity) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/update`, {
+      const response = await apiService.request(`${CART_ENDPOINT}/items/${itemId}`, {
         method: 'PUT',
-        body: {
-          item_id: itemId,
-          quantity: quantity
-        }
+        body: JSON.stringify({ quantity: parseFloat(quantity) })
       });
       return response;
     } catch (error) {
-      console.error('Erro ao atualizar quantidade:', error);
+      console.error('Error updating item quantity:', error);
       throw error;
     }
   },
 
-  // Keep existing methods but ensure they work with the new ID system
+  // Remove item from cart
   async removeItem(itemId) {
     try {
-      await apiService.request(`${CART_ENDPOINT}/remove`, {
-        method: 'DELETE',
-        body: { item_id: itemId }
+      const response = await apiService.request(`${CART_ENDPOINT}/items/${itemId}`, {
+        method: 'DELETE'
       });
-      return true;
+      return response;
     } catch (error) {
-      console.error('Erro ao remover item do carrinho:', error);
+      console.error('Error removing item from cart:', error);
       throw error;
     }
   },
 
-  // Existing methods remain the same
+  // Get current cart
   async getCart() {
     try {
       const response = await apiService.request(CART_ENDPOINT);
       return response;
     } catch (error) {
-      if (error.response?.status === 404) {
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
-      }
-      console.error('Erro ao buscar carrinho:', error);
+      console.error('Error getting cart:', error);
       throw error;
     }
   },
 
+  // Clear cart
   async clearCart() {
     try {
-      await apiService.request(CART_ENDPOINT, { method: 'DELETE' });
-      return true;
+      const response = await apiService.request(CART_ENDPOINT, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'clear' })
+      });
+      return response;
     } catch (error) {
-      console.error('Erro ao limpar carrinho:', error);
+      console.error('Error clearing cart:', error);
+      throw error;
+    }
+  },
+
+  // Checkout
+  async checkout(paymentMethod, amountReceived) {
+    try {
+      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
+        method: 'POST',
+        body: JSON.stringify({
+          payment_method: paymentMethod,
+          amount_received: parseFloat(amountReceived)
+        })
+      });
+      return response;
+    } catch (error) {
+      console.error('Error during checkout:', error);
       throw error;
     }
   },
 
   // Helper methods
   isInCart(items, productId, isWeightBased = false) {
-    if (isWeightBased) return false; // Weight-based items are always unique
     return items.some(item => 
       item.product_id === productId && 
-      !item.is_weight_based
+      item.is_weight_sale === isWeightBased
     );
   },
 
   getItemQuantity(items, productId, isWeightBased = false) {
     const item = items.find(item => 
       item.product_id === productId && 
-      item.is_weight_based === isWeightBased
+      item.is_weight_sale === isWeightBased
     );
     return item ? item.quantity : 0;
-  },
-
-  async checkout(paymentMethod, amountReceived) {
-    try {
-      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
-        method: 'POST',
-        body: {
-          payment_method: paymentMethod,
-          amount_received: parseFloat(amountReceived || 0)
-        }
-      });
-      return response;
-    } catch (error) {
-      console.error('Erro ao finalizar compra:', error);
-      throw error;
-    }
   }
 };
 
