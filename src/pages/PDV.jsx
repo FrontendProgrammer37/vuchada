@@ -68,6 +68,13 @@ const PDV = () => {
     }
   };
 
+  // Filter products based on search term
+  const filteredProducts = products.filter(product => 
+    product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   // Add item to cart with inventory control
   const addToCart = async (product) => {
     if (product.venda_por_peso) {

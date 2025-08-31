@@ -80,7 +80,6 @@ const cartService = {
   async getCart() {
     try {
       const cart = await this.makeRequest(CART_ENDPOINT);
-      // Ensure the cart has all required fields
       return {
         items: cart.items || [],
         subtotal: cart.subtotal || 0,
@@ -89,8 +88,12 @@ const cartService = {
         itemCount: cart.itemCount || (cart.items ? cart.items.length : 0)
       };
     } catch (error) {
-      // Return empty cart if not found or other error
-      return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      // Return empty cart if not found
+      if (error.status === 404) {
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      }
+      console.error('Error getting cart:', error);
+      throw error;
     }
   },
 
