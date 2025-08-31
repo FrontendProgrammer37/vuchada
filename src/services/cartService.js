@@ -1,7 +1,7 @@
 import apiService from './api';
 
-// Remove /api/v1 prefix since it's already included in the baseURL
-const CART_ENDPOINT = 'cart';
+// Base endpoint for cart operations
+const CART_ENDPOINT = '/api/v1/cart/cart';
 const MAX_RETRIES = 2;
 
 // Generate a unique session ID
@@ -15,6 +15,12 @@ class CartService {
   constructor() {
     this.sessionId = localStorage.getItem('sessionId') || generateSessionId();
     this.isInitialized = false;
+    this.getCart = this.getCart.bind(this);
+    this.addItem = this.addItem.bind(this);
+    this.removeItem = this.removeItem.bind(this);
+    this.updateItemQuantity = this.updateItemQuantity.bind(this);
+    this.clearCart = this.clearCart.bind(this);
+    this.checkout = this.checkout.bind(this);
   }
 
   // Create a new cart
@@ -162,31 +168,15 @@ class CartService {
         requestBody.custom_price = parseFloat(customPrice);
       }
 
-      // First try to add the item
-      await this.makeRequest(
-        `${CART_ENDPOINT}/add`,
+      const response = await this.makeRequest(
+        `${CART_ENDPOINT}/items`,
         {
           method: 'POST',
           body: requestBody
         }
       );
-      
-      // Then get the updated cart
-      const updatedCart = await this.getCart();
-      
-      // Ensure all prices are numbers
-      updatedCart.items = updatedCart.items.map(item => ({
-        ...item,
-        price: parseFloat(item.price || 0),
-        subtotal: parseFloat(item.subtotal || 0),
-        unit_price: parseFloat(item.unit_price || item.price || 0)
-      }));
-      
-      updatedCart.subtotal = parseFloat(updatedCart.subtotal || 0);
-      updatedCart.tax_amount = parseFloat(updatedCart.tax_amount || 0);
-      updatedCart.total = parseFloat(updatedCart.total || 0);
-      
-      return updatedCart;
+
+      return this.normalizeCart(response || await this.getCart());
       
     } catch (error) {
       console.error('Failed to add item to cart:', error);
@@ -208,12 +198,37 @@ class CartService {
     }
   }
 
-  // Update item quantity
-  async updateItemQuantity(itemId, quantity) {
-    return this.makeRequest(`${CART_ENDPOINT}/items/${itemId}`, {
-      method: 'PUT',
-      body: { quantity: parseFloat(quantity) }
-    });
+  // Update item quantity in cart
+  async updateItemQuantity(productId, quantity) {
+    if (!productId) {
+      throw new Error('ID do produto é obrigatório');
+    }
+    
+    if (typeof quantity !== 'number' || quantity < 1) {
+      throw new Error('Quantidade inválida');
+    }
+    
+    try {
+      const response = await this.makeRequest(
+        `${CART_ENDPOINT}/items/${productId}`,
+        {
+          method: 'PATCH',
+          body: { quantity: Math.floor(quantity) }
+        }
+      );
+      
+      return this.normalizeCart(response || await this.getCart());
+      
+    } catch (error) {
+      console.error('Erro ao atualizar quantidade do item:', error);
+      
+      if (error.status === 404) {
+        console.warn('Item não encontrado no carrinho, atualizando carrinho...');
+        return this.getCart();
+      }
+      
+      throw new Error(error.response?.detail || 'Erro ao atualizar quantidade do item');
+    }
   }
 
   // Remove item from cart
@@ -223,21 +238,18 @@ class CartService {
     }
     
     try {
-      const response = await this.makeRequest(
-        `${CART_ENDPOINT}/items/${productId}`, 
+      await this.makeRequest(
+        `${CART_ENDPOINT}/items/${productId}`,
         { method: 'DELETE' }
       );
       
-      // Return the updated cart from response or fetch a fresh one
-      if (response && response.items) {
-        return this.normalizeCart(response);
-      }
-      return await this.getCart();
+      // Return the updated cart
+      return this.getCart();
       
     } catch (error) {
       console.error('Erro ao remover item do carrinho:', error);
       
-      // If the item is not found, just return the current cart
+      // If item not found, just return current cart
       if (error.status === 404) {
         console.warn('Item não encontrado no carrinho, atualizando carrinho...');
         return this.getCart();
@@ -249,7 +261,7 @@ class CartService {
 
   // Clear cart
   async clearCart() {
-    return this.makeRequest(`${CART_ENDPOINT}/cart`, {
+    return this.makeRequest(`${CART_ENDPOINT}`, {
       method: 'DELETE'
     });
   }
