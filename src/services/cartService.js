@@ -85,21 +85,40 @@ class CartService {
   // Make API request with retry logic
   async makeRequest(endpoint, options = {}, isRetry = false) {
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Session-ID': this.sessionId,
+        ...(options.headers || {})
+      };
+
+      // Add authorization header if token exists
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      console.log('Making request:', {
+        endpoint,
+        method: options.method || 'GET',
+        headers,
+        body: options.body
+      });
+
       const response = await apiService.request(
         endpoint,
         {
           method: options.method || 'GET',
           body: options.body,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Session-ID': this.sessionId,
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            ...(options.headers || {})
-          }
+          headers
         }
       );
+
+      console.log('API Response:', response);
       return response;
+      
     } catch (error) {
+      console.error('Request failed:', error);
+      
       // If we get a 401 and haven't retried yet, try to refresh the token
       if (error.status === 401 && !isRetry) {
         try {
@@ -168,7 +187,7 @@ class CartService {
       }
 
       const requestBody = {
-        product_id: product.id,
+        product_id: product.id,  
         quantity: isWeightSale ? 1 : Math.floor(quantity),
         is_weight_sale: isWeightSale
       };
@@ -179,6 +198,8 @@ class CartService {
         requestBody.custom_price = parseFloat(customPrice);
       }
 
+      console.log('Sending to backend:', { endpoint: this.ENDPOINTS.ADD_ITEM, body: requestBody });
+
       const response = await this.makeRequest(
         this.ENDPOINTS.ADD_ITEM,
         {
@@ -187,6 +208,7 @@ class CartService {
         }
       );
 
+      console.log('Backend response:', response);
       return this.normalizeCart(response || await this.getCart());
       
     } catch (error) {
