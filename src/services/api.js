@@ -518,12 +518,20 @@ class ApiService {
     // Clear cart
     async clearCart() {
         try {
-            await this.request('cart/clear', {
+            console.log('Clearing cart...');
+            const response = await this.request('cart', {
                 method: 'DELETE'
             });
+            console.log('Cart cleared successfully:', response);
             return true;
         } catch (error) {
-            console.error('Erro ao limpar carrinho:', error);
+            console.error('Error clearing cart:', error);
+            if (error.response) {
+                console.error('Response data:', error.response.data);
+                console.error('Response status:', error.response.status);
+                console.error('Response headers:', error.response.headers);
+            }
+            // Continue even if clear fails
             return false;
         }
     }

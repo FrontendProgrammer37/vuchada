@@ -31,6 +31,7 @@ const PDV = () => {
     isEditing: false,
     cartItemId: null
   });
+  const [processing, setProcessing] = useState(false);
 
   // Load products
   useEffect(() => {
@@ -198,24 +199,44 @@ const PDV = () => {
       return;
     }
     
+    setProcessing(true);
+    setError('Processando venda...');
+
+    const addItemsToCart = async (clearFirst = false) => {
+      try {
+        if (clearFirst) {
+          await apiService.clearCart();
+        }
+
+        // Add all items to cart
+        for (const item of cart) {
+          const cartItem = {
+            product_id: item.id,
+            quantity: item.quantity,
+            is_weight_sale: item.is_weight_based || false,
+            weight_in_kg: item.is_weight_based ? item.quantity : undefined,
+            custom_price: item.sale_price
+          };
+          
+          await apiService.request('cart/add', {
+            method: 'POST',
+            body: JSON.stringify(cartItem)
+          });
+        }
+        return true;
+      } catch (error) {
+        console.error('Error adding items to cart:', error);
+        throw error;
+      }
+    };
+
     try {
-      // First clear any existing items in the cart
-      await apiService.clearCart();
-      
-      // Add all items to cart
-      for (const item of cart) {
-        const cartItem = {
-          product_id: item.id,
-          quantity: item.quantity,
-          is_weight_sale: item.is_weight_based || false,
-          weight_in_kg: item.is_weight_based ? item.quantity : undefined,
-          custom_price: item.sale_price
-        };
-        
-        await apiService.request('cart/add', {
-          method: 'POST',
-          body: JSON.stringify(cartItem)
-        });
+      // First try without clearing
+      try {
+        await addItemsToCart(false);
+      } catch (firstError) {
+        console.log('First attempt failed, retrying with cart clear');
+        await addItemsToCart(true);
       }
 
       // Process checkout
@@ -231,8 +252,7 @@ const PDV = () => {
         body: JSON.stringify(checkoutData)
       });
       
-      // Clear cart and reset form
-      await apiService.clearCart();
+      // Clear local cart and reset form
       setCart([]);
       setPaymentMethod('DINHEIRO');
       setAmountReceived('');
@@ -248,6 +268,8 @@ const PDV = () => {
       const errorMessage = error.response?.data?.detail || error.message || 'Erro ao processar venda';
       setError(`Erro: ${errorMessage}`);
       throw error;
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -527,11 +549,13 @@ const PDV = () => {
                         onClick={processSale}
                         disabled={
                           cart.length === 0 || 
-                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal)
+                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal) ||
+                          processing
                         }
                         className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
                           cart.length === 0 || 
-                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal)
+                          (paymentMethod === 'DINHEIRO' && parseFloat(amountReceived || 0) < cartTotal) ||
+                          processing
                             ? 'bg-gray-400 cursor-not-allowed'
                             : 'bg-blue-600 hover:bg-blue-700'
                         }`}
