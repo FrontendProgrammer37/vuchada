@@ -2,8 +2,6 @@ import apiService from './api';
 
 // Remove /api/v1 prefix since it's already included in the baseURL
 const CART_ENDPOINT = 'cart';
-
-// Maximum number of retries for failed requests
 const MAX_RETRIES = 2;
 
 // Generate a unique session ID
@@ -13,59 +11,108 @@ const generateSessionId = () => {
   return sessionId;
 };
 
-const cartService = {
-  sessionId: localStorage.getItem('sessionId') || generateSessionId(),
+class CartService {
+  constructor() {
+    this.sessionId = localStorage.getItem('sessionId') || generateSessionId();
+    this.isInitialized = false;
+  }
 
-  // Generate a unique ID for cart items
-  generateItemId(product, isWeightBased = false, weight = null) {
-    if (isWeightBased && weight !== null) {
-      return `weight_${product.id}_${Date.now()}`;
+  // Initialize cart if it doesn't exist
+  async initializeCart() {
+    if (this.isInitialized) return;
+    
+    try {
+      // Try to get existing cart
+      await this.getCart();
+    } catch (error) {
+      if (error.status === 404) {
+        // Cart doesn't exist, create a new one
+        await this.makeRequest(CART_ENDPOINT, { method: 'POST' });
+      } else {
+        console.error('Failed to initialize cart:', error);
+        throw error;
+      }
     }
-    return `product_${product.id}`;
-  },
+    
+    this.isInitialized = true;
+  }
 
   // Make API request with retry logic
   async makeRequest(endpoint, options = {}, retryCount = 0) {
+    // Ensure we have a valid auth token
+    const token = localStorage.getItem('token');
+    if (!token && !endpoint.includes('auth')) {
+      // Redirect to login if not authenticated
+      window.location.href = '/login';
+      throw new Error('Not authenticated');
+    }
+
     try {
       const response = await apiService.request(endpoint, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
           'X-Session-ID': this.sessionId,
+          'Authorization': `Bearer ${token}`,
           ...(options.headers || {})
         },
         body: options.body ? JSON.stringify(options.body) : undefined
       });
       return response;
     } catch (error) {
-      // Handle 422 validation errors
-      if (error.status === 422) {
-        console.error('Validation error:', error.response);
-        throw new Error('Dados inválidos. Verifique os campos e tente novamente.');
+      // Handle 401 Unauthorized
+      if (error.status === 401) {
+        if (retryCount < MAX_RETRIES) {
+          try {
+            // Try to refresh token
+            const newToken = await apiService.refreshToken();
+            if (newToken) {
+              // Retry with new token
+              return this.makeRequest(endpoint, {
+                ...options,
+                headers: {
+                  ...options.headers,
+                  'Authorization': `Bearer ${newToken}`
+                }
+              }, retryCount + 1);
+            }
+          } catch (refreshError) {
+            console.error('Failed to refresh token:', refreshError);
+            // Redirect to login on refresh failure
+            window.location.href = '/login';
+            throw new Error('Sessão expirada. Por favor, faça login novamente.');
+          }
+        }
+        window.location.href = '/login';
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
 
       // Handle 404 for cart
       if (error.status === 404 && endpoint === CART_ENDPOINT) {
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
-      }
-
-      // Handle 401 Unauthorized
-      if (error.status === 401 && retryCount < MAX_RETRIES) {
-        try {
-          await apiService.refreshToken();
-          return this.makeRequest(endpoint, options, retryCount + 1);
-        } catch (refreshError) {
-          console.error('Failed to refresh token:', refreshError);
-          throw new Error('Sessão expirada. Por favor, faça login novamente.');
+        // Try to create a new cart if it doesn't exist
+        if (options.method === 'GET' && retryCount === 0) {
+          try {
+            await this.makeRequest(CART_ENDPOINT, { method: 'POST' });
+            return this.makeRequest(endpoint, options, retryCount + 1);
+          } catch (createError) {
+            console.error('Failed to create cart:', createError);
+            return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+          }
         }
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
       }
 
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
     }
-  },
+  }
 
-  // Add item to cart with duplicate prevention
+  // Get current cart
+  async getCart() {
+    return this.makeRequest(CART_ENDPOINT);
+  }
+
+  // Add item to cart
   async addItem(product, quantity = 1, isWeightBased = false, customPrice = null) {
     const itemData = {
       product_id: product.id,
@@ -79,90 +126,47 @@ const cartService = {
 
     return this.makeRequest(`${CART_ENDPOINT}/add`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(itemData)
+      body: itemData
     });
-  },
+  }
 
   // Update item quantity
   async updateItemQuantity(itemId, quantity) {
     return this.makeRequest(`${CART_ENDPOINT}/items/${itemId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ quantity: parseFloat(quantity) })
+      body: { quantity: parseFloat(quantity) }
     });
-  },
+  }
 
   // Remove item from cart
   async removeItem(itemId) {
     return this.makeRequest(`${CART_ENDPOINT}/items/${itemId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      method: 'DELETE'
     });
-  },
-
-  // Get current cart
-  async getCart() {
-    try {
-      const cart = await this.makeRequest(CART_ENDPOINT);
-      return {
-        items: cart.items || [],
-        subtotal: cart.subtotal || 0,
-        tax_amount: cart.tax_amount || 0,
-        total: cart.total || 0,
-        itemCount: cart.itemCount || (cart.items ? cart.items.length : 0)
-      };
-    } catch (error) {
-      // Return empty cart if not found
-      if (error.status === 404) {
-        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
-      }
-      console.error('Error getting cart:', error);
-      throw error;
-    }
-  },
+  }
 
   // Clear cart
   async clearCart() {
-    return this.makeRequest(CART_ENDPOINT, {
+    return this.makeRequest(`${CART_ENDPOINT}/clear`, {
       method: 'DELETE'
     });
-  },
+  }
 
   // Checkout
   async checkout(paymentMethod, amountReceived) {
     const checkoutData = {
       payment_method: paymentMethod,
-      ...(paymentMethod === 'DINHEIRO' && { amount_received: parseFloat(amountReceived) })
     };
+    
+    if (paymentMethod === 'DINHEIRO') {
+      checkoutData.amount_received = parseFloat(amountReceived);
+    }
 
     return this.makeRequest(`${CART_ENDPOINT}/checkout`, {
       method: 'POST',
       body: checkoutData
     });
-  },
-
-  // Helper methods
-  isInCart(items, productId, isWeightBased = false) {
-    return items.some(item => 
-      item.product_id === productId && 
-      item.is_weight_sale === isWeightBased
-    );
-  },
-
-  getItemQuantity(items, productId, isWeightBased = false) {
-    const item = items.find(item => 
-      item.product_id === productId && 
-      item.is_weight_sale === isWeightBased
-    );
-    return item ? item.quantity : 0;
   }
-};
+}
 
-export default cartService;
+export default new CartService();

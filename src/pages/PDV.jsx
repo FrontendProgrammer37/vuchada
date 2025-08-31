@@ -40,10 +40,11 @@ const PDV = () => {
     const loadData = async () => {
       try {
         setLoading(true);
+        // Initialize cart first
+        await cartService.initializeCart();
         // Load products
         const productsData = await apiService.getProducts({ limit: 1000 });
         setProducts(productsData);
-        
         // Load cart
         await loadCart();
       } catch (err) {
