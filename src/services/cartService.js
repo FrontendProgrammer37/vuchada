@@ -1,7 +1,7 @@
 import apiService from './api';
 
 // Base endpoint for cart operations
-const CART_ENDPOINT = '/api/v1/cart/cart';
+const CART_ENDPOINT = '/cart';
 const MAX_RETRIES = 2;
 
 // Generate a unique session ID
