@@ -400,6 +400,19 @@ const PDVPage = () => {
     </button>
   );
 
+  // Função para limpar o carrinho
+  const handleClearCart = async () => {
+    try {
+      await cartService.clearCart();
+      setCart([]);
+      setAmountReceived('');
+      setPaymentMethod('DINHEIRO');
+    } catch (error) {
+      console.error('Erro ao limpar carrinho:', error);
+      alert('Não foi possível limpar o carrinho');
+    }
+  };
+
   const totalItems = cart.reduce((sum, item) => sum + (item.is_weight_based ? 1 : item.quantity), 0);
   const change = amountReceived ? (parseFloat(amountReceived) - cartTotal).toFixed(2) : 0;
 
@@ -643,6 +656,19 @@ const PDVPage = () => {
                             <span>{formatCurrency(cartTotal)}</span>
                           </div>
                         </div>
+
+                        {/* Botão Limpar Carrinho */}
+                        <button
+                          onClick={handleClearCart}
+                          disabled={cart.length === 0 || isLoading}
+                          className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white mt-2 ${
+                            cart.length === 0 || isLoading
+                              ? 'bg-gray-300 cursor-not-allowed'
+                              : 'bg-red-600 hover:bg-red-700'
+                          }`}
+                        >
+                          Limpar Carrinho
+                        </button>
 
                         {/* Checkout Button */}
                         {renderCheckoutButton()}
