@@ -187,7 +187,7 @@ class CartService {
       }
 
       const requestBody = {
-        product_id: product.id,  
+        product_id: product.id,
         quantity: isWeightSale ? 1 : Math.floor(quantity),
         is_weight_sale: isWeightSale
       };
@@ -209,7 +209,11 @@ class CartService {
       );
 
       console.log('Backend response:', response);
-      return this.normalizeCart(response || await this.getCart());
+      
+      // After adding item, fetch the updated cart
+      const updatedCart = await this.getCart();
+      console.log('Updated cart:', updatedCart);
+      return updatedCart;
       
     } catch (error) {
       console.error('Failed to add item to cart:', error);

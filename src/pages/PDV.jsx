@@ -99,10 +99,11 @@ const PDV = () => {
         null // customPrice
       );
       
+      // Update cart state with the full cart data
       setCart(updatedCart);
       
     } catch (err) {
-      console.error('Erro ao adicionar item:', err);
+      console.error('Erro ao adicionar ao carrinho:', err);
       setError(err.message || 'Erro ao adicionar item ao carrinho');
     } finally {
       setLoading(false);
