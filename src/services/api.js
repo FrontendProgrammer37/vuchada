@@ -5,12 +5,21 @@ class ApiService {
     constructor() {
         this.baseURL = config.API_URL; // Já inclui /api/v1 no ambiente de produção
         this.token = localStorage.getItem('token');
+        this.sessionId = localStorage.getItem('sessionId') || this.generateSessionId();
     }
 
-    // Configurar headers com token de autenticação
+    // Gerar um ID de sessão único
+    generateSessionId() {
+        const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('sessionId', sessionId);
+        return sessionId;
+    }
+
+    // Configurar headers com token de autenticação e session ID
     getHeaders() {
         const headers = {
             'Content-Type': 'application/json',
+            'X-Session-ID': this.sessionId
         };
         
         if (this.token) {
@@ -504,6 +513,19 @@ class ApiService {
         return this.request(`sales/${saleId}/print`, {
             method: 'POST',
         });
+    }
+
+    // Clear cart
+    async clearCart() {
+        try {
+            await this.request('cart/clear', {
+                method: 'DELETE'
+            });
+            return true;
+        } catch (error) {
+            console.error('Erro ao limpar carrinho:', error);
+            return false;
+        }
     }
 }
 

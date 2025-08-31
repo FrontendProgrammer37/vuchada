@@ -199,33 +199,55 @@ const PDV = () => {
     }
     
     try {
-      const saleData = {
-        items: cart.map(item => ({
+      // First clear any existing items in the cart
+      await apiService.clearCart();
+      
+      // Add all items to cart
+      for (const item of cart) {
+        const cartItem = {
           product_id: item.id,
           quantity: item.quantity,
-          unit_price: item.sale_price,
-          total_price: item.sale_price * item.quantity,
-          is_weight_based: item.is_weight_based || false,
-          weight: item.is_weight_based ? item.quantity : null
-        })),
+          is_weight_sale: item.is_weight_based || false,
+          weight_in_kg: item.is_weight_based ? item.quantity : undefined,
+          custom_price: item.sale_price
+        };
+        
+        await apiService.request('cart/add', {
+          method: 'POST',
+          body: JSON.stringify(cartItem)
+        });
+      }
+
+      // Process checkout
+      const checkoutData = {
         payment_method: paymentMethod,
-        amount_received: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cartTotal,
-        total_amount: cartTotal,
-        change: paymentMethod === 'DINHEIRO' ? (parseFloat(amountReceived) - cartTotal).toFixed(2) : 0
+        customer_id: null,
+        notes: null,
+        amount_received: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cartTotal
       };
 
-      await apiService.createSale(saleData);
+      const result = await apiService.request('cart/checkout', {
+        method: 'POST',
+        body: JSON.stringify(checkoutData)
+      });
       
       // Clear cart and reset form
+      await apiService.clearCart();
       setCart([]);
       setPaymentMethod('DINHEIRO');
       setAmountReceived('');
       
       // Show success message
-      alert('Venda realizada com sucesso!');
-    } catch (err) {
-      console.error('Erro ao processar venda:', err);
-      alert(err.message || 'Erro ao processar venda. Tente novamente.');
+      setError('Venda registrada com sucesso!');
+      setTimeout(() => setError(''), 3000);
+      
+      return result;
+      
+    } catch (error) {
+      console.error('Erro ao processar venda:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Erro ao processar venda';
+      setError(`Erro: ${errorMessage}`);
+      throw error;
     }
   };
 
