@@ -17,13 +17,10 @@ class CartService {
     this.isInitialized = false;
   }
 
-  // Create a new cart
-  async createCart() {
+  // Create a new cart by adding an item
+  async createCart(product, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
     try {
-      const response = await this.makeRequest(CART_ENDPOINT, {
-        method: 'POST',
-        body: {}
-      }, true);
+      const response = await this.addItem(product, quantity, isWeightSale, weightInKg, customPrice);
       this.isInitialized = true;
       return response;
     } catch (error) {
@@ -43,8 +40,9 @@ class CartService {
       return cart;
     } catch (error) {
       if (error.status === 404) {
-        // Cart doesn't exist, create a new one
-        return this.createCart();
+        // Cart will be created when first item is added
+        this.isInitialized = true;
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0 };
       }
       throw error;
     }
@@ -118,26 +116,27 @@ class CartService {
   }
 
   // Add item to cart
-  async addItem(product, quantity = 1, isWeightBased = false, customPrice = null) {
+  async addItem(product, quantity = 1, isWeightSale = false, weightInKg = 0, customPrice = null) {
     try {
-      await this.initializeCart();
+      const response = await this.makeRequest(
+        `${CART_ENDPOINT}/add`,
+        {
+          method: 'POST',
+          body: {
+            product_id: product.id,
+            quantity,
+            is_weight_sale: isWeightSale,
+            weight_in_kg: weightInKg,
+            custom_price: customPrice
+          }
+        }
+      );
       
-      const itemData = {
-        product_id: product.id,
-        quantity: isWeightBased ? parseFloat(quantity) : Math.floor(quantity),
-        is_weight_sale: isWeightBased,
-      };
-
-      if (customPrice) {
-        itemData.custom_price = parseFloat(customPrice);
-      }
-
-      return this.makeRequest(`${CART_ENDPOINT}/add`, {
-        method: 'POST',
-        body: itemData
-      });
+      // Refresh cart data
+      const updatedCart = await this.getCart();
+      return updatedCart;
     } catch (error) {
-      console.error('Error adding item to cart:', error);
+      console.error('Failed to add item to cart:', error);
       throw error;
     }
   }

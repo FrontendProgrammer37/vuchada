@@ -65,27 +65,14 @@ const PDV = () => {
       setCart(cartData);
     } catch (err) {
       console.error('Erro ao carregar carrinho:', err);
-      // If cart doesn't exist, try to create a new one
+      // Initialize empty cart if not found
       if (err.status === 404) {
-        try {
-          const newCart = await cartService.createCart();
-          setCart(newCart);
-        } catch (createErr) {
-          console.error('Erro ao criar carrinho:', createErr);
-          setError('Erro ao inicializar carrinho');
-        }
+        setCart({ items: [], subtotal: 0, tax_amount: 0, total: 0 });
       } else {
         setError('Erro ao carregar carrinho');
       }
     }
   };
-
-  // Filter products based on search term
-  const filteredProducts = products.filter(product => 
-    product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Add item to cart with inventory control
   const addToCart = async (product) => {
@@ -103,13 +90,8 @@ const PDV = () => {
         return;
       }
 
-      // Ensure cart exists before adding items
-      if (!cart || !cart.id) {
-        await cartService.initializeCart();
-      }
-
-      await cartService.addItem(product, 1, false);
-      const updatedCart = await cartService.getCart();
+      // Add item to cart (will create cart if it doesn't exist)
+      const updatedCart = await cartService.addItem(product, 1, false);
       setCart(updatedCart);
       
     } catch (err) {
@@ -148,6 +130,13 @@ const PDV = () => {
       setProcessing(false);
     }
   };
+
+  // Filter products based on search term
+  const filteredProducts = products.filter(product => 
+    product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // Format currency
   const formatCurrency = (value) => {
