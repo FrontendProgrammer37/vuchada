@@ -43,56 +43,68 @@ class ApiService {
 
     // Função genérica para fazer requisições
     async request(endpoint, options = {}) {
-        // Remove a barra inicial se existir para evitar duplicação
-        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        const url = `${this.baseURL}/${normalizedEndpoint}`;
+        const url = `${this.baseURL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
         
         const config = {
             method: 'GET',
-            headers: this.getHeaders(),
-            ...options,
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Session-ID': this.sessionId,
+                ...options.headers
+            },
+            mode: 'cors',
+            credentials: 'include',
+            ...options
         };
+
+        // Stringify body if it's an object and Content-Type is application/json
+        if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
+            config.body = JSON.stringify(config.body);
+        }
 
         try {
             const response = await fetch(url, config);
-            const responseClone = response.clone(); // Clone the response for potential error handling
             
-            if (!response.ok) {
-                let errorMessage = 'Erro na requisição';
-                try {
-                    const errorData = await responseClone.json();
-                    errorMessage = errorData.detail || JSON.stringify(errorData);
-                } catch (e) {
-                    errorMessage = await responseClone.text();
-                }
-                
-                const error = new Error(errorMessage);
-                error.status = response.status;
-                error.response = response;
-                throw error;
-            }
-
-            // Se a resposta for 204 (No Content), retorna null
+            // Handle 204 No Content
             if (response.status === 204) {
                 return null;
             }
 
-            // Tenta fazer o parse da resposta como JSON
+            // Try to parse JSON response
+            let data;
             try {
-                return await response.json();
+                data = await response.json();
             } catch (e) {
-                console.warn('Resposta não é um JSON válido:', e);
-                return await response.text();
+                console.warn('Failed to parse JSON response:', e);
+                throw new Error('Resposta inválida do servidor');
             }
+
+            // Handle error responses
+            if (!response.ok) {
+                const error = new Error(data.detail || response.statusText || 'Erro na requisição');
+                error.status = response.status;
+                error.data = data;
+                throw error;
+            }
+
+            return data;
+            
         } catch (error) {
-            console.error('Erro na requisição:', {
+            console.error('API Request Error:', {
                 url,
                 error: error.message,
                 status: error.status,
-                response: error.response ? await error.response.text().catch(() => 'Não foi possível ler o corpo da resposta') : null
+                data: error.data
             });
+            
+            // Handle CORS errors
+            if (error.message === 'Failed to fetch') {
+                const corsError = new Error('Não foi possível conectar ao servidor. Verifique sua conexão ou tente novamente mais tarde.');
+                corsError.isCorsError = true;
+                throw corsError;
+            }
+            
             throw error;
         }
     }

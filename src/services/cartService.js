@@ -1,6 +1,6 @@
 import apiService from './api';
 
-const CART_ENDPOINT = 'cart';
+const CART_ENDPOINT = '/api/v1/cart';
 
 const cartService = {
   // Generate a unique ID for cart items
@@ -33,12 +33,10 @@ const cartService = {
         ...(customPrice && { custom_price: parseFloat(customPrice) })
       };
 
-      const response = await apiService.request(`${CART_ENDPOINT}/add`, {
+      return await apiService.request(`${CART_ENDPOINT}/add`, {
         method: 'POST',
-        body: JSON.stringify(itemData)
+        body: itemData
       });
-      
-      return response;
     } catch (error) {
       console.error('Error adding item to cart:', error);
       throw error;
@@ -48,11 +46,10 @@ const cartService = {
   // Update item quantity
   async updateItemQuantity(itemId, quantity) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/items/${itemId}`, {
+      return await apiService.request(`${CART_ENDPOINT}/items/${itemId}`, {
         method: 'PUT',
-        body: JSON.stringify({ quantity: parseFloat(quantity) })
+        body: { quantity: parseFloat(quantity) }
       });
-      return response;
     } catch (error) {
       console.error('Error updating item quantity:', error);
       throw error;
@@ -62,10 +59,9 @@ const cartService = {
   // Remove item from cart
   async removeItem(itemId) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/items/${itemId}`, {
+      return await apiService.request(`${CART_ENDPOINT}/items/${itemId}`, {
         method: 'DELETE'
       });
-      return response;
     } catch (error) {
       console.error('Error removing item from cart:', error);
       throw error;
@@ -75,9 +71,12 @@ const cartService = {
   // Get current cart
   async getCart() {
     try {
-      const response = await apiService.request(CART_ENDPOINT);
-      return response;
+      return await apiService.request(CART_ENDPOINT);
     } catch (error) {
+      // Return empty cart if not found
+      if (error.status === 404) {
+        return { items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 };
+      }
       console.error('Error getting cart:', error);
       throw error;
     }
@@ -86,11 +85,9 @@ const cartService = {
   // Clear cart
   async clearCart() {
     try {
-      const response = await apiService.request(CART_ENDPOINT, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'clear' })
+      return await apiService.request(CART_ENDPOINT, {
+        method: 'DELETE'
       });
-      return response;
     } catch (error) {
       console.error('Error clearing cart:', error);
       throw error;
@@ -100,14 +97,15 @@ const cartService = {
   // Checkout
   async checkout(paymentMethod, amountReceived) {
     try {
-      const response = await apiService.request(`${CART_ENDPOINT}/checkout`, {
+      const checkoutData = {
+        payment_method: paymentMethod,
+        ...(paymentMethod === 'DINHEIRO' && { amount_received: parseFloat(amountReceived) })
+      };
+
+      return await apiService.request(`${CART_ENDPOINT}/checkout`, {
         method: 'POST',
-        body: JSON.stringify({
-          payment_method: paymentMethod,
-          amount_received: parseFloat(amountReceived)
-        })
+        body: checkoutData
       });
-      return response;
     } catch (error) {
       console.error('Error during checkout:', error);
       throw error;
