@@ -2,8 +2,8 @@
 
 const ENV = {
   development: {
-    // No desenvolvimento, usamos o proxy configurado no Vite
-    API_URL: 'http://localhost:5173/api',
+    // No desenvolvimento, apontamos para o backend local
+    API_URL: 'http://localhost:8000/api/v1',
   },
   production: {
     // Em produção, usamos a URL direta da API

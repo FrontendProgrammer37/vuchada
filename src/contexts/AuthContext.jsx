@@ -17,30 +17,35 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Verificar se há token salvo ao carregar a aplicação
+    // Check authentication status on app load
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            checkAuth();
-        } else {
-            setLoading(false);
-        }
-    }, []);
+        const checkAuth = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    // Try to get user data from localStorage first
+                    const storedUser = localStorage.getItem('user');
+                    if (storedUser) {
+                        setUser(JSON.parse(storedUser));
+                    }
+                    
+                    // Then refresh from the server
+                    const userData = await apiService.getCurrentUser();
+                    setUser(userData);
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                // Clear invalid auth data
+                apiService.removeToken();
+                localStorage.removeItem('user');
+                setUser(null);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    // Verificar autenticação com o token salvo
-    const checkAuth = async () => {
-        try {
-            const userData = await apiService.getCurrentUser();
-            setUser(userData);
-            setError(null);
-        } catch (err) {
-            console.error('Erro ao verificar autenticação:', err);
-            apiService.removeToken();
-            setUser(null);
-        } finally {
-            setLoading(false);
-        }
-    };
+        checkAuth();
+    }, []);
 
     // Login
     const login = async (username, password) => {
@@ -49,10 +54,18 @@ export const AuthProvider = ({ children }) => {
             setError(null);
             
             const response = await apiService.login(username, password);
-            const userData = await apiService.getCurrentUser();
             
+            // Use the user data from the login response
+            if (response.user) {
+                setUser(response.user);
+                return { success: true };
+            }
+            
+            // Fallback: Try to get user data from /me endpoint
+            const userData = await apiService.getCurrentUser();
             setUser(userData);
             return { success: true };
+            
         } catch (err) {
             setError(err.message || 'Erro no login');
             return { success: false, error: err.message };
@@ -64,13 +77,15 @@ export const AuthProvider = ({ children }) => {
     // Logout
     const logout = async () => {
         try {
-            // Limpar o carrinho antes de fazer logout
+            // Clear the cart before logging out
             await cartService.clearCart();
         } catch (error) {
-            console.error('Erro ao limpar carrinho durante logout:', error);
-            // Continua com o logout mesmo se houver erro ao limpar o carrinho
+            console.error('Error clearing cart during logout:', error);
+            // Continue with logout even if clearing cart fails
         } finally {
+            // Clear all auth-related data
             apiService.logout();
+            localStorage.removeItem('user');
             setUser(null);
             setError(null);
         }

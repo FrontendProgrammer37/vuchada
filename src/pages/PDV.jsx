@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Trash2, ShoppingCart, Scale, CreditCard, DollarSign } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, X, ShoppingCart, Scale, CreditCard, DollarSign, Info } from 'lucide-react';
 import apiService from '../services/api';
 import cartService from '../services/cartService';
+import checkoutService from '../services/checkoutService';
 import WeightInputModal from '../components/WeightInputModal';
+import ProductDetailsModal from '../components/ProductDetailsModal';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const PAYMENT_METHODS = [
   { value: 'DINHEIRO', label: 'Dinheiro' },
@@ -26,14 +29,17 @@ const PDV = () => {
   const [amountReceived, setAmountReceived] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [weightInput, setWeightInput] = useState({
-    isOpen: false,
-    product: null,
-    isEditing: false,
-    cartItemId: null
-  });
   const [processing, setProcessing] = useState(false);
   const [showCart, setShowCart] = useState(false);
+  const [stockError, setStockError] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+  const [showWeightModal, setShowWeightModal] = useState(false);
+
+  useEffect(() => {
+    setStockError(null);
+  }, [cart]);
 
   // Load products and cart on component mount
   useEffect(() => {
@@ -74,39 +80,107 @@ const PDV = () => {
     }
   };
 
-  // Add item to cart with inventory control
-  const addToCart = async (product) => {
+  // Handle adding product to cart
+  const handleAddToCart = async (product, quantity = 1) => {
     try {
-      setLoading(true);
+      setProcessing(true);
       
-      if (product.venda_por_peso) {
-        const maxWeight = product.track_inventory ? product.current_stock : null;
-        setWeightInput({
-          isOpen: true,
-          product: { ...product, maxWeight },
-          initialWeight: '0.100',
-          isEditing: false
-        });
+      // Log the product data for debugging
+      console.log('Adding product to cart:', {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        codigo: product.codigo,
+        allProps: product
+      });
+      
+      // If product is sold by weight, show weight input modal
+      if (product.is_weight_sale) {
+        setSelectedProduct(product);
+        setShowWeightModal(true);
+        setProcessing(false);
         return;
       }
 
-      // For non-weight based items, add directly to cart
-      const updatedCart = await cartService.addItem(
-        product,
-        1, // quantity
-        false, // isWeightSale
-        0, // weightInKg
-        null // customPrice
-      );
+      // Create a product object with all necessary fields
+      const productWithSku = {
+        ...product,
+        sku: product.sku || product.codigo || null
+      };
+
+      // Log the product data being sent to cart service
+      console.log('Product data being sent to cart service:', productWithSku);
+
+      // Add item to cart
+      await cartService.addItem(productWithSku, quantity);
       
-      // Update cart state with the full cart data
+      // Update cart
+      const updatedCart = await cartService.getCart();
       setCart(updatedCart);
       
-    } catch (err) {
-      console.error('Erro ao adicionar ao carrinho:', err);
-      setError(err.message || 'Erro ao adicionar item ao carrinho');
+      // Update product list to reflect stock changes
+      const updatedProducts = products.map(p => 
+        p.id === product.id 
+          ? { ...p, stock_quantity: p.stock_quantity - quantity } 
+          : p
+      );
+      setProducts(updatedProducts);
+      
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      // toast.error(error.message || 'Erro ao adicionar ao carrinho');
     } finally {
-      setLoading(false);
+      setProcessing(false);
+    }
+  };
+
+  // Handle weight confirmation
+  const handleWeightConfirm = async (weight) => {
+    try {
+      setProcessing(true);
+      const weightNum = parseFloat(weight);
+      
+      if (!selectedProduct) return;
+      
+      // Calculate total price based on weight
+      const totalPrice = selectedProduct.unit_price * weightNum;
+      
+      // Create a product object with all necessary fields including SKU
+      const productWithSku = {
+        ...selectedProduct,
+        sku: selectedProduct.sku || selectedProduct.codigo || null
+      };
+      
+      // Add item to cart with weight
+      await cartService.addItem(
+        productWithSku, 
+        1, // quantity is 1 for weight-based items
+        true, // isWeightSale
+        weightNum, // weightInKg
+        totalPrice // customPrice
+      );
+      
+      // Update cart
+      const updatedCart = await cartService.getCart();
+      setCart(updatedCart);
+      
+      // Update product list to reflect stock changes
+      const updatedProducts = products.map(p => 
+        p.id === selectedProduct.id 
+          ? { ...p, stock_quantity: p.stock_quantity - weightNum } 
+          : p
+      );
+      setProducts(updatedProducts);
+      
+      // Reset state
+      setShowWeightModal(false);
+      setSelectedProduct(null);
+      
+    } catch (error) {
+      console.error('Error adding weighted item to cart:', error);
+      // toast.error(error.message || 'Erro ao adicionar item ao carrinho');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -129,22 +203,23 @@ const PDV = () => {
     try {
       // Dados para o checkout
       const checkoutData = {
-        paymentMethod,
-        amountReceived: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : 0,
-        customerId: null, // Você pode adicionar um seletor de cliente posteriormente
-        discount: 0, // Você pode adicionar um campo de desconto se necessário
+        payment_method: paymentMethod,
+        amount_received: paymentMethod === 'DINHEIRO' ? parseFloat(amountReceived) : cart.total,
+        customer_id: null, // Você pode adicionar um seletor de cliente posteriormente
         notes: '' // Você pode adicionar um campo de observações se necessário
       };
 
-      // Chamar o serviço de checkout com todos os dados necessários
-      const result = await cartService.checkout(checkoutData);
+      // Chamar o serviço de checkout
+      const result = await checkoutService.processCheckout(checkoutData);
       
-      // Limpar carrinho e estado após venda bem-sucedida
-      setCart({ items: [], subtotal: 0, tax_amount: 0, total: 0, itemCount: 0 });
+      // Limpar carrinho após venda bem-sucedida
+      await cartService.clearCart();
+      const updatedCart = await cartService.getCart();
+      setCart(updatedCart);
       setAmountReceived('');
       
       // Mostrar mensagem de sucesso com detalhes da venda
-      alert(`Venda #${result.sale_number} realizada com sucesso!\nTotal: ${formatCurrency(result.total_amount)}`);
+      // alert(`Venda #${result.sale_number} realizada com sucesso!\nTotal: ${formatCurrency(result.total_amount)}`);
       
     } catch (err) {
       console.error('Erro ao processar venda:', err);
@@ -164,19 +239,27 @@ const PDV = () => {
     }
   };
 
+  // Sort products by name
+  const sortedProducts = [...products].sort((a, b) => 
+    a.name.localeCompare(b.name, 'pt', {sensitivity: 'base'})
+  );
+
   // Filter products based on search term
-  const filteredProducts = products.filter(product => 
+  const filteredProducts = sortedProducts.filter(product => 
     product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Format currency
+  // Format currency in MT (Metical)
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-MZ', {
       style: 'currency',
-      currency: 'MZN'
-    }).format(value);
+      currency: 'MZN',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      currencyDisplay: 'code'
+    }).format(value || 0).replace('MZN', 'MT');
   };
 
   // Format weight
@@ -187,6 +270,11 @@ const PDV = () => {
   // Toggle cart visibility on mobile
   const toggleCart = () => {
     setShowCart(!showCart);
+  };
+
+  const showProductDetails = (product) => {
+    setSelectedProduct(product);
+    setIsModalOpen(true);
   };
 
   return (
@@ -216,7 +304,7 @@ const PDV = () => {
               className="sm:hidden flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <ShoppingCart className="h-5 w-5 mr-1" />
-              <span>{cart.itemCount}</span>
+              <span>{cart.itemCount || 0}</span>
             </button>
           </div>
         </div>
@@ -281,7 +369,7 @@ const PDV = () => {
                           </td>
                           <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
-                              onClick={() => addToCart(product)}
+                              onClick={() => handleAddToCart(product)}
                               className="inline-flex items-center px-2 py-1 sm:px-3 sm:py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                             >
                               <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -304,21 +392,10 @@ const PDV = () => {
           {/* Cart - Full width on mobile, 1/3 on larger screens */}
           <div className={`w-full lg:w-1/3 ${!showCart ? 'hidden lg:block' : ''}`}>
             <div className="bg-white shadow sm:rounded-lg h-full flex flex-col">
-              <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">
-                    Carrinho <span className="text-gray-500 text-sm">({cart.itemCount} itens)</span>
-                  </h3>
-                  <button 
-                    onClick={toggleCart}
-                    className="lg:hidden text-gray-400 hover:text-gray-500"
-                  >
-                    <span className="sr-only">Fechar carrinho</span>
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+              <div className="px-4 py-3 sm:px-6 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Carrinho ({!cart.itemCount ? '0 itens' : `${cart.itemCount} ${cart.itemCount === 1 ? 'item' : 'itens'}`})
+                </h3>
               </div>
               
               <div className="flex-1 overflow-y-auto p-4">
@@ -329,44 +406,170 @@ const PDV = () => {
                     <p className="mt-1 text-sm text-gray-500">Adicione itens ao carrinho para continuar</p>
                   </div>
                 ) : (
-                  <ul className="divide-y divide-gray-200">
-                    {cart.items.map((item) => (
-                      <li key={item.id} className="py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{item.product_name || item.name}</p>
-                            <p className="text-sm text-gray-500">
-                              {formatCurrency(item.price || item.unit_price)} × {item.is_weight_sale ? formatWeight(item.quantity) + 'kg' : item.quantity}
-                            </p>
-                          </div>
-                          <div className="ml-4 flex items-center">
-                            <p className="text-sm font-medium text-gray-900">
-                              {formatCurrency((item.price || item.unit_price) * item.quantity)}
-                            </p>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const updatedCart = await cartService.removeItem(item.product_id || item.id);
-                                  setCart({
-                                    ...updatedCart,
-                                    itemCount: updatedCart.items?.length || 0,
-                                    tax_amount: updatedCart.tax_amount || 0
+                  <div className={`${cart.items.length > 2 ? 'max-h-[50vh] overflow-y-auto pr-2' : ''}`}>
+                    <ul className="divide-y divide-gray-200">
+                      {cart.items.map((item, index) => (
+                        <li key={`${item.id || 'item'}-${index}`} className="py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">
+                                {item.product_name || item.name || item.nome}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {item.sku || item.codigo ? `Código: ${item.sku || item.codigo}` : 'Sem código'}
+                              </p>
+                            </div>
+                            <div className="ml-4 flex items-center space-x-2">
+                              <p className="text-sm font-medium text-gray-900">
+                                {formatCurrency(item.price || item.unit_price)} × {item.is_weight_sale ? formatWeight(item.quantity) + 'kg' : item.quantity}
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setSelectedProduct({
+                                    ...item,
+                                    nome: item.product_name || item.nome || item.name,
+                                    preco_venda: item.price || item.unit_price,
+                                    estoque: item.estoque_disponivel || item.estoque,
+                                    is_weight_sale: item.is_weight_sale || false
                                   });
-                                } catch (err) {
-                                  console.error('Erro ao remover item:', err);
-                                  setError(err.message || 'Erro ao remover item do carrinho');
+                                  setIsModalOpen(true);
+                                }}
+                                className="text-blue-500 hover:text-blue-700"
+                                title="Ver detalhes"
+                              >
+                                <Info className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    setStockError(null);
+                                    const newQuantity = item.quantity - 1;
+                                    if (newQuantity < 1) return;
+                                  
+                                    // Update local state first for immediate feedback
+                                    setCart(prevCart => {
+                                      const updatedItems = prevCart.items.map(i => 
+                                        (i.product_id || i.id) === (item.product_id || item.id)
+                                          ? { ...i, quantity: newQuantity, total_price: i.unit_price * newQuantity }
+                                          : i
+                                      );
+                                      const subtotal = updatedItems.reduce((sum, i) => sum + i.total_price, 0);
+                                      return {
+                                        ...prevCart,
+                                        items: updatedItems,
+                                        subtotal,
+                                        total: subtotal
+                                      };
+                                    });
+                                  
+                                    // Then sync with backend
+                                    await cartService.updateItemQuantity(item.product_id || item.id, newQuantity);
+                                  
+                                  } catch (err) {
+                                    console.error('Erro ao diminuir quantidade:', err);
+                                    setStockError(err.message);
+                                    // Revert local state on error
+                                    const refreshedCart = await cartService.getCart();
+                                    setCart({
+                                      ...refreshedCart,
+                                      itemCount: refreshedCart.items?.length || 0,
+                                      tax_amount: refreshedCart.tax_amount || 0
+                                    });
+                                  }
+                                }}
+                                className="text-yellow-500 hover:text-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={item.quantity <= 1}
+                                title="Diminuir quantidade"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </button>
+                              
+                              <span className="mx-2 w-8 text-center">
+                                {item.quantity}
+                              </span>
+                              
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    setStockError(null);
+                                    const newQuantity = item.quantity + 1;
+                                  
+                                    // Check stock before making the API call
+                                    if (item.estoque_disponivel !== undefined && newQuantity > item.estoque_disponivel) {
+                                      throw new Error(`Estoque insuficiente. Disponível: ${item.estoque_disponivel}`);
+                                    }
+                                  
+                                    // Update local state first for immediate feedback
+                                    setCart(prevCart => {
+                                      const updatedItems = prevCart.items.map(i => 
+                                        (i.product_id || i.id) === (item.product_id || item.id)
+                                          ? { ...i, quantity: newQuantity, total_price: i.unit_price * newQuantity }
+                                          : i
+                                      );
+                                      const subtotal = updatedItems.reduce((sum, i) => sum + i.total_price, 0);
+                                      return {
+                                        ...prevCart,
+                                        items: updatedItems,
+                                        subtotal,
+                                        total: subtotal
+                                      };
+                                    });
+                                  
+                                    // Then sync with backend
+                                    await cartService.updateItemQuantity(item.product_id || item.id, newQuantity);
+                                  
+                                  } catch (err) {
+                                    console.error('Erro ao aumentar quantidade:', err);
+                                    setStockError(err.message);
+                                    // Revert local state on error
+                                    const refreshedCart = await cartService.getCart();
+                                    setCart({
+                                      ...refreshedCart,
+                                      itemCount: refreshedCart.items?.length || 0,
+                                      tax_amount: refreshedCart.tax_amount || 0
+                                    });
+                                  }
+                                }}
+                                className={`text-green-500 hover:text-green-700 ${
+                                  (item.estoque_disponivel !== undefined && item.quantity >= item.estoque_disponivel) 
+                                    ? 'opacity-50 cursor-not-allowed' 
+                                    : ''
+                                }`}
+                                title={
+                                  item.estoque_disponivel !== undefined && item.quantity >= item.estoque_disponivel
+                                    ? 'Estoque esgotado'
+                                    : 'Aumentar quantidade'
                                 }
-                              }}
-                              className="text-red-500 hover:text-red-700"
-                              disabled={processing}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                                disabled={item.estoque_disponivel !== undefined && item.quantity >= item.estoque_disponivel}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const updatedCart = await cartService.removeItem(item.product_id || item.id);
+                                    setCart({
+                                      ...updatedCart,
+                                      itemCount: updatedCart.items?.length || 0,
+                                      tax_amount: updatedCart.tax_amount || 0
+                                    });
+                                  } catch (err) {
+                                    console.error('Erro ao remover item:', err);
+                                    setError(err.message || 'Erro ao remover item do carrinho');
+                                  }
+                                }}
+                                className="text-red-500 hover:text-red-700"
+                                disabled={processing}
+                                title="Remover item"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
               
@@ -395,7 +598,7 @@ const PDV = () => {
                       id="payment-method"
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
                       {PAYMENT_METHODS.map((method) => (
                         <option key={method.value} value={method.value}>
@@ -410,25 +613,45 @@ const PDV = () => {
                       <label htmlFor="amount-received" className="block text-sm font-medium text-gray-700 mb-1">
                         Valor Recebido
                       </label>
-                      <div className="mt-1 relative rounded-md shadow-sm">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <DollarSign className="h-5 w-5 text-gray-400" />
+                      <div className="mt-1">
+                        <div className="relative rounded-lg shadow-sm border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all duration-200">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span className="text-gray-600 font-medium">MT</span>
+                          </div>
+                          <input
+                            type="number"
+                            name="amountReceived"
+                            id="amountReceived"
+                            value={amountReceived || ''}
+                            onChange={(e) => setAmountReceived(e.target.value)}
+                            className="block w-full pl-12 pr-16 py-3 sm:text-lg font-medium border-0 focus:ring-0 focus:outline-none bg-transparent"
+                            placeholder="0.00"
+                            step="0.01"
+                            min="0"
+                            inputMode="decimal"
+                          />
+                          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                            <span className="text-gray-400 text-sm font-medium">
+                              {formatCurrency(amountReceived || 0).replace('MT', '')}
+                            </span>
+                          </div>
                         </div>
-                        <input
-                          type="number"
-                          id="amount-received"
-                          value={amountReceived}
-                          onChange={(e) => setAmountReceived(e.target.value)}
-                          className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
-                          placeholder="0.00"
-                          min={cart.total}
-                          step="0.01"
-                        />
                       </div>
                       {amountReceived && parseFloat(amountReceived) > 0 && (
-                        <p className="mt-1 text-sm text-gray-500">
-                          Troco: {formatCurrency(parseFloat(amountReceived) - cart.total)}
-                        </p>
+                        <div className="mt-3 space-y-1">
+                          <div className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg">
+                            <span className="text-sm font-medium text-gray-600">Total a pagar:</span>
+                            <span className="text-base font-semibold text-gray-900">
+                              {formatCurrency(cart.total || 0)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
+                            <span className="text-sm font-medium text-blue-700">Troco:</span>
+                            <span className="text-base font-bold text-blue-700">
+                              {formatCurrency(parseFloat(amountReceived || 0) - parseFloat(cart.total || 0))}
+                            </span>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}
@@ -444,6 +667,16 @@ const PDV = () => {
                   >
                     {processing ? 'Processando...' : 'Finalizar Venda'}
                   </button>
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setShowClearCartConfirm(true)}
+                      disabled={!cart.itemCount}
+                      className="w-full flex justify-center items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="h-5 w-5 mr-2" />
+                      Limpar Carrinho
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -464,7 +697,7 @@ const PDV = () => {
               className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <ShoppingCart className="h-5 w-5 mr-1" />
-              Ver Carrinho ({cart.itemCount})
+              <span>{cart.itemCount || 0}</span>
             </button>
             <button
               onClick={processSale}
@@ -481,21 +714,60 @@ const PDV = () => {
         </div>
       </div>
 
+      {/* Stock error message */}
+      {stockError && (
+        <div className="fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <div className="flex items-center">
+            <svg className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>{stockError}</span>
+          </div>
+        </div>
+      )}
+
       {/* Weight Input Modal */}
       <WeightInputModal
-        isOpen={weightInput.isOpen}
-        onClose={() => setWeightInput({ ...weightInput, isOpen: false })}
-        product={weightInput.product}
-        initialWeight={weightInput.initialWeight}
-        onConfirm={async (weight, price) => {
+        isOpen={showWeightModal}
+        onClose={() => {
+          setShowWeightModal(false);
+          setSelectedProduct(null);
+        }}
+        onConfirm={handleWeightConfirm}
+        product={selectedProduct}
+        pricePerKg={selectedProduct?.unit_price || 0}
+        maxWeight={selectedProduct?.stock_quantity || 0}
+      />
+
+      {/* Product Details Modal */}
+      <ProductDetailsModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        product={selectedProduct}
+      />
+
+      {/* Clear Cart Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showClearCartConfirm}
+        onClose={() => setShowClearCartConfirm(false)}
+        onConfirm={async () => {
           try {
-            await cartService.addItem(weightInput.product, weight, true, price);
-            await loadCart();
-            setShowCart(true);
+            const clearedCart = await cartService.clearCart();
+            setCart({
+              ...clearedCart,
+              itemCount: 0,
+              tax_amount: 0
+            });
+            setAmountReceived('');
           } catch (err) {
-            setError(err.message || 'Erro ao adicionar item ao carrinho');
+            console.error('Erro ao limpar carrinho:', err);
           }
         }}
+        title="Limpar Carrinho"
+        message="Tem certeza que deseja remover todos os itens do carrinho?"
+        confirmText="Sim, Limpar"
+        cancelText="Cancelar"
+        confirmVariant="danger"
       />
     </div>
   );

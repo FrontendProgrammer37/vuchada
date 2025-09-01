@@ -35,10 +35,12 @@ class ApiService {
         localStorage.setItem('token', token);
     }
 
-    // Remover token (logout)
+    // Remove token (logout)
     removeToken() {
         this.token = null;
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Clear any other auth-related data here
     }
 
     // Função genérica para fazer requisições
@@ -53,12 +55,15 @@ class ApiService {
             method: 'GET',
             headers: this.getHeaders(),
             ...options,
-            mode: 'cors', // Força o modo CORS
-            credentials: 'include', // Inclui credenciais se necessário
+            mode: 'cors',
+            credentials: 'include',
+            cache: 'no-cache',
+            redirect: 'follow',
+            referrerPolicy: 'no-referrer-when-downgrade'
         };
 
         // Se tiver corpo na requisição, converte para JSON
-        if (options.body) {
+        if (options.body && typeof options.body === 'object') {
             config.body = JSON.stringify(options.body);
             config.headers = {
                 ...config.headers,
@@ -128,7 +133,6 @@ class ApiService {
         formData.append('client_id', 'web');
         formData.append('client_secret', 'web-secret');
 
-        // Usando fetch diretamente para evitar o wrapper request que pode estar adicionando headers indesejados
         const response = await fetch(`${this.baseURL}/auth/login`, {
             method: 'POST',
             headers: {
@@ -146,6 +150,12 @@ class ApiService {
 
         const data = await response.json();
         this.setToken(data.access_token);
+        
+        // Store user data in localStorage
+        if (data.user) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+        }
+        
         return data;
     }
 
@@ -154,7 +164,21 @@ class ApiService {
     }
 
     async getCurrentUser() {
-        return this.request('auth/me');
+        try {
+            const response = await this.request('auth/me');
+            // Store the updated user data in localStorage
+            if (response) {
+                localStorage.setItem('user', JSON.stringify(response));
+            }
+            return response;
+        } catch (error) {
+            // If unauthorized, clear the token and user data
+            if (error.status === 401) {
+                this.removeToken();
+                localStorage.removeItem('user');
+            }
+            throw error;
+        }
     }
 
     // ===== CATEGORIAS =====
@@ -372,68 +396,58 @@ class ApiService {
 
     // ===== FUNCIONÁRIOS =====
     
-    /**
-     * Lista todos os funcionários com suporte a paginação
-     * @param {Object} params - Parâmetros de paginação
-     * @param {number} [params.page=1] - Número da página
-     * @param {number} [params.size=10] - Itens por página
-     * @returns {Promise<Object>} Lista de funcionários e metadados de paginação
-     */
-    async getEmployees({ page = 1, size = 10 } = {}) {
-        const query = new URLSearchParams({ page, size });
-        return this.request(`employees/?${query}`);
+    async getEmployees(params = {}) {
+        const queryParams = new URLSearchParams();
+        
+        // Add pagination
+        if (params.page) queryParams.append('page', params.page);
+        if (params.size) queryParams.append('size', params.size);
+        
+        // Add filters
+        if (params.role !== undefined) queryParams.append('role', params.role);
+        if (params.search !== undefined) queryParams.append('search', params.search);
+        
+        // Incluir inativos se solicitado (apenas para administradores)
+        if (params.show_inactive === true) {
+            queryParams.append('show_inactive', 'true');
+        }
+        
+        // Add sorting
+        if (params.sort_by) {
+            queryParams.append('sort_by', params.sort_by);
+            queryParams.append('sort_order', params.sort_order || 'asc');
+        }
+        
+        const queryString = queryParams.toString();
+        const endpoint = `employees${queryString ? `?${queryString}` : ''}`;
+        
+        return this.request(endpoint);
     }
 
-    /**
-     * Obtém os detalhes de um funcionário
-     * @param {number|string} id - ID do funcionário
-     * @returns {Promise<Object>} Dados do funcionário
-     */
     async getEmployee(id) {
         return this.request(`employees/${id}`);
     }
 
-    /**
-     * Cria um novo funcionário
-     * @param {Object} employeeData - Dados do funcionário
-     * @param {string} employeeData.full_name - Nome completo
-     * @param {string} employeeData.username - Nome de usuário
-     * @param {string} employeeData.password - Senha
-     * @param {number} employeeData.salary - Salário
-     * @param {boolean} employeeData.is_admin - Se é administrador
-     * @param {boolean} employeeData.can_sell - Pode realizar vendas
-     * @param {boolean} employeeData.can_manage_inventory - Pode gerenciar estoque
-     * @param {boolean} employeeData.can_manage_expenses - Pode gerenciar despesas
-     * @returns {Promise<Object>} Dados do funcionário criado
-     */
     async createEmployee(employeeData) {
-        return this.request('employees/', {
+        return this.request('employees', {
             method: 'POST',
+            headers: this.getHeaders(),
             body: JSON.stringify(employeeData)
         });
     }
 
-    /**
-     * Atualiza um funcionário existente
-     * @param {number|string} id - ID do funcionário
-     * @param {Object} employeeData - Dados atualizados do funcionário
-     * @returns {Promise<Object>} Dados do funcionário atualizado
-     */
     async updateEmployee(id, employeeData) {
         return this.request(`employees/${id}`, {
             method: 'PUT',
+            headers: this.getHeaders(),
             body: JSON.stringify(employeeData)
         });
     }
 
-    /**
-     * Remove um funcionário (soft delete)
-     * @param {number|string} id - ID do funcionário
-     * @returns {Promise<Object>} Resultado da operação
-     */
     async deleteEmployee(id) {
         return this.request(`employees/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: this.getHeaders()
         });
     }
 
