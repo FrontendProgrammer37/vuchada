@@ -7,6 +7,21 @@ import WeightInputModal from '../components/WeightInputModal';
 import ProductDetailsModal from '../components/ProductDetailsModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 
+// Custom toast notification function
+const showToast = (message, type = 'success') => {
+  const toast = document.createElement('div');
+  toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-md shadow-lg text-white ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} transition-all duration-300 transform translate-x-0 opacity-100`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  // Auto remove after 5 seconds
+  setTimeout(() => {
+    toast.style.transform = 'translateX(120%)';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+};
+
 const PAYMENT_METHODS = [
   { value: 'DINHEIRO', label: 'Dinheiro' },
   { value: 'MPESA', label: 'M-Pesa' },
@@ -218,22 +233,22 @@ const PDV = () => {
       setCart(updatedCart);
       setAmountReceived('');
       
-      // Mostrar mensagem de sucesso com detalhes da venda
-      // alert(`Venda #${result.sale_number} realizada com sucesso!\nTotal: ${formatCurrency(result.total_amount)}`);
+      // Show success toast
+      showToast(`✅ Venda #${result.sale_number} finalizada com sucesso!\nTotal: ${formatCurrency(result.total_amount)}`);
       
     } catch (err) {
       console.error('Erro ao processar venda:', err);
       
-      // Tratamento de erros específicos
+      // Show error toast
+      let errorMessage = 'Ocorreu um erro ao processar a venda';
       if (err.status === 422) {
-        setError('Dados inválidos: ' + (err.detail || 'Verifique os dados informados'));
+        errorMessage = 'Dados inválidos: ' + (err.detail || 'Verifique os dados informados');
       } else if (err.status === 400) {
-        setError('Erro na requisição: ' + (err.message || 'Dados inválidos'));
+        errorMessage = 'Erro na requisição: ' + (err.message || 'Dados inválidos');
       } else if (err.message) {
-        setError(err.message);
-      } else {
-        setError('Ocorreu um erro ao processar a venda. Tente novamente.');
+        errorMessage = err.message;
       }
+      showToast(`❌ ${errorMessage}`, 'error');
     } finally {
       setProcessing(false);
     }
